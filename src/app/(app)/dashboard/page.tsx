@@ -15,7 +15,11 @@ export default async function DashboardPage() {
     include: {
       manager: { select: { id: true, name: true } },
       milestones: {
-        include: { tasks: true },
+        include: {
+          tasks: {
+            select: { id: true, name: true, status: true, dueDate: true },
+          },
+        },
         orderBy: { order: "asc" },
       },
     },
