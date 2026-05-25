@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatDate } from "@/lib/utils";
-import { Plus, FileStack, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, FileStack, Trash2, ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
 
 interface TemplateTask { id: string; name: string; durationDays: number; order: number; }
 interface TemplateMilestone {
@@ -17,20 +16,53 @@ interface Template {
   _count: { projects: number };
 }
 
+type MilestoneForm = { name: string; offsetDays: number; tasks: { name: string; durationDays: number }[] };
+type TemplateForm = { name: string; description: string; milestones: MilestoneForm[] };
+
+const emptyForm = (): TemplateForm => ({
+  name: "", description: "",
+  milestones: [{ name: "", offsetDays: 0, tasks: [{ name: "", durationDays: 1 }] }],
+});
+
+function templateToForm(tmpl: Template): TemplateForm {
+  return {
+    name: tmpl.name,
+    description: tmpl.description ?? "",
+    milestones: tmpl.milestones.map((m) => ({
+      name: m.name,
+      offsetDays: m.offsetDays,
+      tasks: m.tasks.map((t) => ({ name: t.name, durationDays: t.durationDays })),
+    })),
+  };
+}
+
 export function TemplatesClient({ templates: initial, currentUserRole }: {
   templates: Template[]; currentUserRole: string;
 }) {
   const router = useRouter();
   const [templates, setTemplates] = useState(initial);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    name: "", description: "",
-    milestones: [{ name: "", offsetDays: 0, tasks: [{ name: "", durationDays: 1 }] }],
-  });
+
+  // Modal state: null = fermé, "new" = création, templateId = édition
+  const [modalMode, setModalMode] = useState<null | "new" | string>(null);
+  const [form, setForm] = useState<TemplateForm>(emptyForm());
 
   const canDelete = currentUserRole === "ADMIN";
+
+  function openNew() {
+    setForm(emptyForm());
+    setModalMode("new");
+  }
+
+  function openEdit(tmpl: Template) {
+    setForm(templateToForm(tmpl));
+    setModalMode(tmpl.id);
+  }
+
+  function closeModal() {
+    setModalMode(null);
+  }
 
   function toggleExpand(id: string) {
     setExpanded((prev) => {
@@ -47,11 +79,24 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
     }));
   }
 
+  function removeMilestone(mIdx: number) {
+    setForm((f) => ({ ...f, milestones: f.milestones.filter((_, i) => i !== mIdx) }));
+  }
+
   function addTaskToMilestone(mIdx: number) {
     setForm((f) => ({
       ...f,
       milestones: f.milestones.map((m, i) =>
         i === mIdx ? { ...m, tasks: [...m.tasks, { name: "", durationDays: 1 }] } : m
+      ),
+    }));
+  }
+
+  function removeTask(mIdx: number, tIdx: number) {
+    setForm((f) => ({
+      ...f,
+      milestones: f.milestones.map((m, i) =>
+        i === mIdx ? { ...m, tasks: m.tasks.filter((_, j) => j !== tIdx) } : m
       ),
     }));
   }
@@ -74,31 +119,43 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
     }));
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    const payload = {
+      name: form.name,
+      description: form.description,
+      milestones: form.milestones.map((m, i) => ({
+        name: m.name,
+        offsetDays: Number(m.offsetDays),
+        order: i,
+        tasks: m.tasks.map((t, j) => ({ name: t.name, durationDays: Number(t.durationDays), order: j })),
+      })),
+    };
+
     try {
-      const res = await fetch("/api/templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          description: form.description,
-          milestones: form.milestones.map((m, i) => ({
-            name: m.name,
-            offsetDays: Number(m.offsetDays),
-            order: i,
-            tasks: m.tasks.map((t, j) => ({
-              name: t.name,
-              durationDays: Number(t.durationDays),
-              order: j,
-            })),
-          })),
-        }),
-      });
-      if (res.ok) {
-        setShowNew(false);
-        router.refresh();
+      if (modalMode === "new") {
+        const res = await fetch("/api/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) { closeModal(); router.refresh(); }
+      } else {
+        const res = await fetch(`/api/templates/${modalMode}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          setTemplates((prev) =>
+            prev.map((t) =>
+              t.id === modalMode ? { ...t, ...updated, _count: t._count, createdBy: t.createdBy } : t
+            )
+          );
+          closeModal();
+        }
       }
     } finally {
       setSaving(false);
@@ -111,6 +168,8 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
     if (res.ok) setTemplates((t) => t.filter((tmpl) => tmpl.id !== id));
   }
 
+  const isEditing = modalMode !== null && modalMode !== "new";
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
@@ -119,7 +178,7 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
           <p className="text-gray-500 mt-1">{templates.length} template(s)</p>
         </div>
         <button
-          onClick={() => setShowNew(true)}
+          onClick={openNew}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -165,14 +224,24 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
                     <span>Par {tmpl.createdBy.name}</span>
                   </div>
                 </div>
-                {canDelete && (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(tmpl.id); }}
-                    className="p-1.5 text-gray-300 hover:text-red-400 transition-colors"
+                    onClick={() => openEdit(tmpl)}
+                    className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Modifier"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Pencil className="w-4 h-4" />
                   </button>
-                )}
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDelete(tmpl.id)}
+                      className="p-1.5 text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {isExpanded && (
@@ -201,12 +270,20 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
         })}
       </div>
 
-      {/* Modal nouveau template */}
-      {showNew && (
+      {/* Modal création / édition */}
+      {modalMode !== null && (
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl w-full max-w-2xl my-8 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-5">Nouveau template</h2>
-            <form onSubmit={handleCreate} className="space-y-4">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {isEditing ? "Modifier le template" : "Nouveau template"}
+              </h2>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
                 <input
@@ -246,10 +323,19 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
                             className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
+                        {form.milestones.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeMilestone(mIdx)}
+                            className="text-gray-300 hover:text-red-400 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                       <div className="pl-3 space-y-1.5">
                         {m.tasks.map((t, tIdx) => (
-                          <div key={tIdx} className="flex gap-2">
+                          <div key={tIdx} className="flex gap-2 items-center">
                             <input
                               required value={t.name}
                               onChange={(e) => updateTask(mIdx, tIdx, "name", e.target.value)}
@@ -264,6 +350,15 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
                               />
                               <span className="text-xs text-gray-400">j</span>
                             </div>
+                            {m.tasks.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeTask(mIdx, tIdx)}
+                                className="text-gray-300 hover:text-red-400 transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         ))}
                         <button
@@ -289,7 +384,7 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowNew(false)}
+                  onClick={closeModal}
                   className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
                 >
                   Annuler
@@ -298,7 +393,7 @@ export function TemplatesClient({ templates: initial, currentUserRole }: {
                   type="submit" disabled={saving}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-medium"
                 >
-                  {saving ? "Création..." : "Créer le template"}
+                  {saving ? "Sauvegarde..." : isEditing ? "Enregistrer les modifications" : "Créer le template"}
                 </button>
               </div>
             </form>
