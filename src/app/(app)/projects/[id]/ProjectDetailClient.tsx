@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { formatDate, getStatusLabel } from "@/lib/utils";
-import { ChevronLeft, User, Calendar, Save } from "lucide-react";
+import { ChevronLeft, ChevronDown, User, Calendar, Save, Pencil, LayoutTemplate } from "lucide-react";
 import { MilestonesTab } from "./tabs/MilestonesTab";
 import { ResourcesTab } from "./tabs/ResourcesTab";
 import { TaskPanel } from "./TaskPanel";
@@ -16,12 +16,12 @@ const RichTextEditor = dynamic(
 );
 
 const HEALTH_OPTIONS = [
-  { value: "ON_TRACK", label: "Dans les temps", color: "bg-green-100 text-green-700 border-green-200" },
-  { value: "AT_RISK", label: "À risque", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  { value: "LATE", label: "En retard", color: "bg-red-100 text-red-700 border-red-200" },
-  { value: "BLOCKED", label: "Bloqué", color: "bg-red-100 text-red-800 border-red-300" },
-  { value: "CANCELLED", label: "Annulé", color: "bg-gray-100 text-gray-600 border-gray-200" },
-  { value: "COMPLETED", label: "Terminé", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  { value: "ON_TRACK",  label: "Dans les temps", color: "bg-green-100 text-green-700 border-green-200",  dot: "bg-green-500" },
+  { value: "AT_RISK",   label: "À risque",        color: "bg-yellow-100 text-yellow-700 border-yellow-200", dot: "bg-yellow-400" },
+  { value: "LATE",      label: "En retard",       color: "bg-red-100 text-red-700 border-red-200",        dot: "bg-red-500" },
+  { value: "BLOCKED",   label: "Bloqué",          color: "bg-red-100 text-red-800 border-red-300",        dot: "bg-red-700" },
+  { value: "CANCELLED", label: "Annulé",          color: "bg-gray-100 text-gray-600 border-gray-200",     dot: "bg-gray-400" },
+  { value: "COMPLETED", label: "Terminé",         color: "bg-blue-100 text-blue-700 border-blue-200",     dot: "bg-blue-500" },
 ];
 
 const TABS = ["Résumé", "Milestones", "Gantt", "Ressources"] as const;
@@ -49,6 +49,7 @@ export function ProjectDetailClient({
   const [health, setHealth] = useState(project.health);
   const [summary, setSummary] = useState(project.summary ?? "");
   const [summarySaving, setSummarySaving] = useState(false);
+  const [editingSummary, setEditingSummary] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const allTasks = milestones.flatMap((m) => m.tasks);
@@ -64,6 +65,12 @@ export function ProjectDetailClient({
       body: JSON.stringify({ summary, health }),
     });
     setSummarySaving(false);
+    setEditingSummary(false);
+  }
+
+  function cancelEdit() {
+    setSummary(project.summary ?? "");
+    setEditingSummary(false);
   }
 
   async function changeHealth(newHealth: string) {
@@ -87,26 +94,15 @@ export function ProjectDetailClient({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold text-gray-900">{project.name}</h1>
-                {/* Health badge + selector */}
-                <div className="relative group">
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium border cursor-pointer select-none ${healthOption.color}`}>
-                    {healthOption.label}
-                  </span>
-                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 hidden group-hover:block min-w-[160px] py-1">
-                    {HEALTH_OPTIONS.map((h) => (
-                      <button key={h.value} onClick={() => changeHealth(h.value)}
-                        className={`flex items-center gap-2 px-3 py-2 w-full text-sm hover:bg-gray-50 transition-colors ${h.value === health ? "font-medium" : ""}`}>
-                        <span className={`w-2 h-2 rounded-full ${h.color.split(" ")[0]}`} />
-                        {h.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Health badge */}
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${healthOption.color}`}>
+                  {healthOption.label}
+                </span>
               </div>
               <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-400">
                 <span className="flex items-center gap-1"><User className="w-3 h-3" />{project.manager.name}</span>
                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(project.startDate)} → {formatDate(project.endDate)}</span>
-                {project.template && <span className="text-blue-400">Template: {project.template.name}</span>}
+                {project.template && <span className="text-blue-400 flex items-center gap-1"><LayoutTemplate className="w-3 h-3" />{project.template.name}</span>}
               </div>
             </div>
           </div>
@@ -135,29 +131,146 @@ export function ProjectDetailClient({
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Résumé */}
+
+        {/* ── Résumé ── */}
         {activeTab === "Résumé" && (
-          <div className="p-6 max-w-3xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900">Résumé du projet</h2>
-              <button onClick={saveSummary} disabled={summarySaving}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors">
-                <Save className="w-3.5 h-3.5" />
-                {summarySaving ? "Sauvegarde..." : "Sauvegarder"}
-              </button>
+          <div className="flex gap-6 p-6">
+
+            {/* Left: summary content */}
+            <div className="flex-1 min-w-0">
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+                  <h2 className="font-semibold text-gray-900 text-sm">Résumé du projet</h2>
+                  {!editingSummary && (
+                    <button
+                      onClick={() => setEditingSummary(true)}
+                      className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Modifier
+                    </button>
+                  )}
+                </div>
+
+                <div className="p-5">
+                  {editingSummary ? (
+                    <>
+                      <RichTextEditor
+                        content={summary}
+                        onChange={setSummary}
+                        placeholder="Décrivez l'état du projet, les risques, les décisions clés..."
+                      />
+                      <div className="flex items-center gap-2 mt-4">
+                        <button
+                          onClick={saveSummary}
+                          disabled={summarySaving}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          {summarySaving ? "Sauvegarde..." : "Sauvegarder"}
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </>
+                  ) : summary ? (
+                    <div
+                      className="prose prose-sm max-w-none text-gray-700 prose-headings:text-gray-900 prose-a:text-blue-600"
+                      dangerouslySetInnerHTML={{ __html: summary }}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setEditingSummary(true)}
+                      className="flex flex-col items-center justify-center w-full py-12 text-gray-300 hover:text-gray-400 border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-xl transition-colors gap-2"
+                    >
+                      <Pencil className="w-6 h-6" />
+                      <span className="text-sm">Ajouter un résumé</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-            <RichTextEditor
-              content={summary}
-              onChange={setSummary}
-              placeholder="Décrivez l'état du projet, les risques, les décisions clés..."
-            />
-            <p className="text-xs text-gray-400 mt-2">
-              Cliquez sur le statut en haut pour le modifier. Le résumé se sauvegarde avec le bouton ci-dessus.
-            </p>
+
+            {/* Right sidebar */}
+            <div className="w-64 flex-shrink-0 space-y-4">
+
+              {/* Health card */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Statut de santé</p>
+                <div className="relative group">
+                  <button className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg border font-medium text-sm transition-colors ${healthOption.color}`}>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${healthOption.dot}`} />
+                    <span className="flex-1 text-left">{healthOption.label}</span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+                  </button>
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 hidden group-hover:block py-1">
+                    {HEALTH_OPTIONS.map((h) => (
+                      <button key={h.value} onClick={() => changeHealth(h.value)}
+                        className={`flex items-center gap-2 px-3 py-2 w-full text-sm hover:bg-gray-50 transition-colors ${h.value === health ? "font-semibold" : ""}`}>
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${h.dot}`} />
+                        {h.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Project info */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Informations</p>
+                <div className="flex items-start gap-2.5">
+                  <User className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Chef de projet</p>
+                    <p className="text-sm font-medium text-gray-900">{project.manager.name}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Calendar className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Dates</p>
+                    <p className="text-sm text-gray-700">{formatDate(project.startDate)}</p>
+                    <p className="text-sm text-gray-700">→ {formatDate(project.endDate)}</p>
+                  </div>
+                </div>
+                {project.template && (
+                  <div className="flex items-start gap-2.5 pt-2 border-t border-gray-100">
+                    <LayoutTemplate className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Template</p>
+                      <p className="text-sm text-blue-600 font-medium">{project.template.name}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Progress */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Avancement</p>
+                <div className="flex items-end justify-between mb-1.5">
+                  <span className="text-2xl font-bold text-gray-900">{progress}%</span>
+                  <span className="text-xs text-gray-400 mb-1">{doneTasks} / {allTasks.length} tâches</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-500 ${progress === 100 ? "bg-green-500" : "bg-blue-500"}`}
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                {progress === 100 && (
+                  <p className="text-xs text-green-600 font-medium mt-2">Toutes les tâches sont terminées !</p>
+                )}
+              </div>
+
+            </div>
           </div>
         )}
 
-        {/* Milestones */}
+        {/* ── Milestones ── */}
         {activeTab === "Milestones" && (
           <MilestonesTab
             projectId={project.id}
@@ -169,14 +282,14 @@ export function ProjectDetailClient({
           />
         )}
 
-        {/* Gantt */}
+        {/* ── Gantt ── */}
         {activeTab === "Gantt" && (
           <div className="p-6">
             <GanttClient project={{ id: project.id, name: project.name, startDate: project.startDate, endDate: project.endDate, milestones }} />
           </div>
         )}
 
-        {/* Ressources */}
+        {/* ── Ressources ── */}
         {activeTab === "Ressources" && (
           <ResourcesTab projectId={project.id} />
         )}
