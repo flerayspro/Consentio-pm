@@ -51,6 +51,9 @@ export function ProjectDetailClient({
   const [summarySaving, setSummarySaving] = useState(false);
   const [editingSummary, setEditingSummary] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [manager, setManager] = useState(project.manager);
+  const [editingManager, setEditingManager] = useState(false);
+  const [managerSaving, setManagerSaving] = useState(false);
 
   const allTasks = milestones.flatMap((m) => m.tasks);
   const doneTasks = allTasks.filter((t) => t.status === "DONE").length;
@@ -71,6 +74,21 @@ export function ProjectDetailClient({
   function cancelEdit() {
     setSummary(project.summary ?? "");
     setEditingSummary(false);
+  }
+
+  async function saveManager(newManagerId: string) {
+    setManagerSaving(true);
+    const res = await fetch(`/api/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ managerId: newManagerId }),
+    });
+    if (res.ok) {
+      const found = users.find((u) => u.id === newManagerId);
+      if (found) setManager({ id: found.id, name: found.name, email: found.email });
+    }
+    setManagerSaving(false);
+    setEditingManager(false);
   }
 
   async function changeHealth(newHealth: string) {
@@ -100,7 +118,7 @@ export function ProjectDetailClient({
                 </span>
               </div>
               <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-400">
-                <span className="flex items-center gap-1"><User className="w-3 h-3" />{project.manager.name}</span>
+                <span className="flex items-center gap-1"><User className="w-3 h-3" />{manager.name}</span>
                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(project.startDate)} → {formatDate(project.endDate)}</span>
                 {project.template && <span className="text-blue-400 flex items-center gap-1"><LayoutTemplate className="w-3 h-3" />{project.template.name}</span>}
               </div>
@@ -224,9 +242,40 @@ export function ProjectDetailClient({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Informations</p>
                 <div className="flex items-start gap-2.5">
                   <User className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-400 mb-0.5">Chef de projet</p>
-                    <p className="text-sm font-medium text-gray-900">{project.manager.name}</p>
+                    {editingManager ? (
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          defaultValue={manager.id}
+                          onChange={(e) => saveManager(e.target.value)}
+                          disabled={managerSaving}
+                          autoFocus
+                          className="flex-1 min-w-0 text-sm border border-blue-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                        >
+                          {users.map((u) => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => setEditingManager(false)}
+                          className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-sm font-medium text-gray-900">{manager.name}</p>
+                        <button
+                          onClick={() => setEditingManager(true)}
+                          className="p-1 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                          title="Modifier le chef de projet"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5">
