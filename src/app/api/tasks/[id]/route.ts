@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (allDone) {
       await prisma.milestone.update({ where: { id: task.milestoneId }, data: { status: "DONE" } });
     }
-  } else if (parsed.data.status && parsed.data.status !== "DONE") {
+  } else if (parsed.data.status) {
     await prisma.milestone.update({ where: { id: task.milestoneId }, data: { status: "IN_PROGRESS" } });
   }
 
