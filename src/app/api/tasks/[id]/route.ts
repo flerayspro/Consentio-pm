@@ -12,6 +12,30 @@ const updateSchema = z.object({
   ownerId: z.string().nullable().optional(),
 });
 
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const { id } = await params;
+  const task = await prisma.task.findUnique({
+    where: { id },
+    include: {
+      owner: { select: { id: true, name: true } },
+      comments: {
+        include: { author: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+      files: {
+        include: { uploadedBy: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
+
+  if (!task) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+  return NextResponse.json(task);
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
