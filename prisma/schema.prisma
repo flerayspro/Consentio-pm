@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PROJECT_MANAGER
+  MEMBER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          Role      @default(MEMBER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  managedProjects   Project[]      @relation("ProjectManager")
+  ownedTasks        Task[]         @relation("TaskOwner")
+  createdTemplates  ProjectTemplate[]
+}
+
+model ProjectTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  milestones  TemplateMilestone[]
+  projects    Project[]
+}
+
+model TemplateMilestone {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  order       Int      @default(0)
+  offsetDays  Int      @default(0) // jours depuis le début du projet
+
+  template    ProjectTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId  String
+
+  tasks       TemplateTask[]
+}
+
+model TemplateTask {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  order       Int      @default(0)
+  durationDays Int     @default(1)
+
+  milestone   TemplateMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  milestoneId String
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  manager     User   @relation("ProjectManager", fields: [managerId], references: [id])
+  managerId   String
+
+  template    ProjectTemplate? @relation(fields: [templateId], references: [id])
+  templateId  String?
+
+  milestones  Milestone[]
+}
+
+model Milestone {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  dueDate     DateTime
+  status      TaskStatus @default(TODO)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+
+  tasks       Task[]
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  status      TaskStatus @default(TODO)
+  dueDate     DateTime
+  order       Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  milestoneId String
+
+  owner       User?   @relation("TaskOwner", fields: [ownerId], references: [id])
+  ownerId     String?
+}
