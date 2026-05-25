@@ -194,7 +194,18 @@ export function ProjectDetailClient({
             setMilestones((prev) =>
               prev.map((m) => ({
                 ...m,
-                tasks: m.tasks.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t)),
+                tasks: m.tasks.map((t) =>
+                  t.id === updatedTask.id
+                    ? {
+                        ...t,
+                        name: updatedTask.name ?? t.name,
+                        description: updatedTask.description ?? t.description,
+                        status: updatedTask.status ?? t.status,
+                        dueDate: updatedTask.dueDate ? new Date(updatedTask.dueDate as unknown as string) : t.dueDate,
+                        owner: updatedTask.owner !== undefined ? updatedTask.owner : t.owner,
+                      }
+                    : t
+                ),
               }))
             );
           }}
