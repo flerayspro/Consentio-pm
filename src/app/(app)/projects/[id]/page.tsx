@@ -4,13 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { ProjectDetailClient } from "./ProjectDetailClient";
 
-export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
+export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return null;
 
+  const { id } = await params;
   const [project, users] = await Promise.all([
     prisma.project.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         manager: { select: { id: true, name: true, email: true } },
         template: { select: { id: true, name: true } },

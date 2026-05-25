@@ -13,12 +13,13 @@ const updateSchema = z.object({
   managerId: z.string().optional(),
 });
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+  const { id } = await params;
   const project = await prisma.project.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       manager: { select: { id: true, name: true, email: true } },
       template: { select: { id: true, name: true } },
@@ -38,10 +39,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json(project);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+  const { id } = await params;
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -50,20 +52,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (parsed.data.startDate) data.startDate = new Date(parsed.data.startDate);
   if (parsed.data.endDate) data.endDate = new Date(parsed.data.endDate);
 
-  const project = await prisma.project.update({
-    where: { id: params.id },
-    data,
-  });
-
+  const project = await prisma.project.update({ where: { id }, data });
   return NextResponse.json(project);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   if (session.user.role === "MEMBER")
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
-  await prisma.project.delete({ where: { id: params.id } });
+  const { id } = await params;
+  await prisma.project.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

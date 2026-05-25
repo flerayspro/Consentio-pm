@@ -9,12 +9,13 @@ const updateSchema = z.object({
   description: z.string().optional(),
 });
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+  const { id } = await params;
   const template = await prisma.projectTemplate.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       createdBy: { select: { id: true, name: true } },
       milestones: {
@@ -28,30 +29,28 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json(template);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   if (session.user.role === "MEMBER")
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
+  const { id } = await params;
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const template = await prisma.projectTemplate.update({
-    where: { id: params.id },
-    data: parsed.data,
-  });
-
+  const template = await prisma.projectTemplate.update({ where: { id }, data: parsed.data });
   return NextResponse.json(template);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   if (session.user.role !== "ADMIN")
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
-  await prisma.projectTemplate.delete({ where: { id: params.id } });
+  const { id } = await params;
+  await prisma.projectTemplate.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

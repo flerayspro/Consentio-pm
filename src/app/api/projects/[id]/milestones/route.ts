@@ -11,17 +11,18 @@ const createSchema = z.object({
   order: z.number().optional(),
 });
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   if (session.user.role === "MEMBER")
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
+  const { id } = await params;
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const count = await prisma.milestone.count({ where: { projectId: params.id } });
+  const count = await prisma.milestone.count({ where: { projectId: id } });
 
   const milestone = await prisma.milestone.create({
     data: {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       description: parsed.data.description,
       dueDate: new Date(parsed.data.dueDate),
       order: parsed.data.order ?? count,
-      projectId: params.id,
+      projectId: id,
     },
     include: { tasks: true },
   });

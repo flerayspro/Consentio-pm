@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { GanttClient } from "./GanttClient";
 
-export default async function GanttPage({ params }: { params: { id: string } }) {
+export default async function GanttPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return null;
 
+  const { id } = await params;
   const project = await prisma.project.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       milestones: {
         include: {

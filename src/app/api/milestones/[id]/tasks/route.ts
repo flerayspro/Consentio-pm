@@ -11,17 +11,18 @@ const createSchema = z.object({
   ownerId: z.string().optional(),
 });
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   if (session.user.role === "MEMBER")
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
+  const { id } = await params;
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const count = await prisma.task.count({ where: { milestoneId: params.id } });
+  const count = await prisma.task.count({ where: { milestoneId: id } });
 
   const task = await prisma.task.create({
     data: {
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       dueDate: new Date(parsed.data.dueDate),
       ownerId: parsed.data.ownerId,
       order: count,
-      milestoneId: params.id,
+      milestoneId: id,
     },
     include: { owner: { select: { id: true, name: true } } },
   });

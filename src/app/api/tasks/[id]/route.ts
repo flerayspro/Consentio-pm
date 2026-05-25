@@ -12,10 +12,11 @@ const updateSchema = z.object({
   ownerId: z.string().nullable().optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+  const { id } = await params;
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -24,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (parsed.data.dueDate) data.dueDate = new Date(parsed.data.dueDate);
 
   const task = await prisma.task.update({
-    where: { id: params.id },
+    where: { id },
     data,
     include: { owner: { select: { id: true, name: true } } },
   });
@@ -35,31 +36,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { milestoneId: task.milestoneId },
       select: { status: true },
     });
-
     const allDone = sibling.every((t) => t.status === "DONE");
     if (allDone) {
-      await prisma.milestone.update({
-        where: { id: task.milestoneId },
-        data: { status: "DONE" },
-      });
+      await prisma.milestone.update({ where: { id: task.milestoneId }, data: { status: "DONE" } });
     }
   } else if (parsed.data.status && parsed.data.status !== "DONE") {
-    // Reopen milestone if a task is re-opened
-    await prisma.milestone.update({
-      where: { id: task.milestoneId },
-      data: { status: "IN_PROGRESS" },
-    });
+    await prisma.milestone.update({ where: { id: task.milestoneId }, data: { status: "IN_PROGRESS" } });
   }
 
   return NextResponse.json(task);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   if (session.user.role === "MEMBER")
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
-  await prisma.task.delete({ where: { id: params.id } });
+  const { id } = await params;
+  await prisma.task.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }
