@@ -7,7 +7,7 @@ import { useState } from "react";
 import { cn, getRoleLabel } from "@/lib/utils";
 import {
   LayoutDashboard, FolderKanban, FileStack, LogOut,
-  ChevronRight, ChevronDown, Circle, CheckSquare, Settings,
+  ChevronRight, ChevronDown, Circle, CheckSquare, Settings, ShieldCheck,
 } from "lucide-react";
 
 const HEALTH_COLORS: Record<string, string> = {
@@ -31,11 +31,14 @@ export function Sidebar({ user, projects, templates }: SidebarProps) {
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const navItems = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/mes-taches", label: "Mes tâches", icon: CheckSquare },
-    { href: "/projects", label: "Tous les projets", icon: FolderKanban },
+    { href: "/dashboard",  label: "Dashboard",        icon: LayoutDashboard },
+    { href: "/mes-taches", label: "Mes tâches",        icon: CheckSquare },
+    { href: "/projects",   label: "Tous les projets",  icon: FolderKanban },
     ...(user.role !== "MEMBER"
       ? [{ href: "/templates", label: "Templates", icon: FileStack }]
+      : []),
+    ...(user.role === "ADMIN"
+      ? [{ href: "/admin", label: "Administration", icon: ShieldCheck }]
       : []),
   ];
 
