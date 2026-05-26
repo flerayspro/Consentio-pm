@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
-function requireAdmin(session: Awaited<ReturnType<typeof getServerSession>>) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function requireAdmin(session: any) {
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   if (session.user.role !== "ADMIN") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   return null;
