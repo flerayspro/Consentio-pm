@@ -26,16 +26,20 @@ function toGanttTasks(project: ProjectData): Task[] {
   const projectEnd = new Date(project.endDate);
 
   for (const milestone of project.milestones) {
-    const mStart = milestone.tasks.length > 0
-      ? new Date(Math.min(...milestone.tasks.map((t) => new Date(t.dueDate).getTime())))
-      : projectStart;
+    // Date de fin = dueDate de la milestone (point de référence unique)
     const mEnd = new Date(milestone.dueDate);
+
+    // Date de début = la plus ancienne dueDate parmi les tâches,
+    // mais jamais après mEnd (on affiche au minimum une barre d'1 jour)
+    const taskDates = milestone.tasks.map((t) => new Date(t.dueDate).getTime());
+    const earliestTask = taskDates.length > 0 ? new Date(Math.min(...taskDates)) : mEnd;
+    const mStart = earliestTask <= mEnd ? earliestTask : mEnd;
 
     tasks.push({
       id: `milestone-${milestone.id}`,
       name: milestone.name,
-      start: mStart > mEnd ? mEnd : mStart,
-      end: mEnd < projectStart ? projectStart : mEnd,
+      start: mStart,
+      end: mEnd,
       type: "project",
       progress: milestone.tasks.length > 0
         ? Math.round((milestone.tasks.filter((t) => t.status === "DONE").length / milestone.tasks.length) * 100)
@@ -50,9 +54,14 @@ function toGanttTasks(project: ProjectData): Task[] {
     });
 
     for (const task of milestone.tasks) {
+      // La tâche se termine à sa dueDate.
+      // Elle commence au début de la milestone (ou 1 jour avant si même jour que la fin).
       const taskEnd = new Date(task.dueDate);
-      const taskStart = new Date(taskEnd);
-      taskStart.setDate(taskStart.getDate() - 1);
+      const taskStart = new Date(mStart);
+      // Si la tâche commence et finit le même jour, on affiche quand même une barre d'1 jour
+      if (taskStart.getTime() === taskEnd.getTime()) {
+        taskStart.setDate(taskStart.getDate() - 1);
+      }
 
       tasks.push({
         id: `task-${task.id}`,
