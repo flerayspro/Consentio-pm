@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Settings } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 import { cn, getRoleLabel } from "@/lib/utils";
 import {
   LayoutDashboard, FolderKanban, FileStack, LogOut,
-  ChevronRight, ChevronDown, Circle, CheckSquare,
+  ChevronRight, ChevronDown, Circle, CheckSquare, Settings,
 } from "lucide-react";
 
 const HEALTH_COLORS: Record<string, string> = {
@@ -138,17 +139,26 @@ export function Sidebar({ user, projects, templates }: SidebarProps) {
 
       {/* User + logout */}
       <div className="p-3 border-t border-gray-100 flex-shrink-0">
-        <div className="flex items-center gap-2.5 px-2 py-1.5 mb-1">
-          <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-gray-600 text-xs font-medium">
+        <Link
+          href="/profil"
+          className={cn(
+            "flex items-center gap-2.5 px-2 py-1.5 mb-1 rounded-lg transition-colors group",
+            pathname === "/profil" ? "bg-blue-50" : "hover:bg-gray-100"
+          )}
+        >
+          <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-xs font-bold">
               {user.name.charAt(0).toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">{user.name}</p>
+            <p className={cn("text-xs font-medium truncate", pathname === "/profil" ? "text-blue-700" : "text-gray-900")}>
+              {user.name}
+            </p>
             <p className="text-xs text-gray-400">{getRoleLabel(user.role)}</p>
           </div>
-        </div>
+          <Settings className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" />
+        </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="flex items-center gap-2 px-2 py-1.5 w-full rounded-lg text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
