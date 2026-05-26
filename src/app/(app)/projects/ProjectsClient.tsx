@@ -11,10 +11,19 @@ interface Task { id: string; status: string; dueDate: Date; }
 interface Milestone { id: string; tasks: Task[]; }
 interface Project {
   id: string; name: string; description?: string | null;
-  status: string; startDate: Date; endDate: Date;
+  status: string; health: string; startDate: Date; endDate: Date;
   manager: { id: string; name: string };
   milestones: Milestone[];
 }
+
+const HEALTH_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
+  ON_TRACK:  { label: "Dans les temps", color: "bg-green-100 text-green-700 border-green-200",     dot: "bg-green-500" },
+  AT_RISK:   { label: "À risque",        color: "bg-yellow-100 text-yellow-700 border-yellow-200", dot: "bg-yellow-400" },
+  LATE:      { label: "En retard",       color: "bg-red-100 text-red-700 border-red-200",          dot: "bg-red-500" },
+  BLOCKED:   { label: "Bloqué",          color: "bg-red-100 text-red-800 border-red-300",          dot: "bg-red-700" },
+  CANCELLED: { label: "Annulé",          color: "bg-gray-100 text-gray-600 border-gray-200",       dot: "bg-gray-400" },
+  COMPLETED: { label: "Terminé",         color: "bg-blue-100 text-blue-700 border-blue-200",       dot: "bg-blue-500" },
+};
 interface User { id: string; name: string; email: string; }
 interface Template { id: string; name: string; }
 
@@ -127,6 +136,8 @@ export function ProjectsClient({
           const overdueTasks = project.milestones.flatMap((m) => m.tasks)
             .filter((t) => t.status !== "DONE" && isOverdue(t.dueDate)).length;
 
+          const healthCfg = HEALTH_CONFIG[project.health] ?? HEALTH_CONFIG.ON_TRACK;
+
           return (
             <Link
               key={project.id}
@@ -135,16 +146,20 @@ export function ProjectsClient({
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h3 className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
                       {project.name}
                     </h3>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[project.status]}`}>
                       {getStatusLabel(project.status)}
                     </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border flex items-center gap-1 ${healthCfg.color}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${healthCfg.dot}`} />
+                      {healthCfg.label}
+                    </span>
                     {overdue && (
                       <span className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
-                        <AlertTriangle className="w-3 h-3" /> En retard
+                        <AlertTriangle className="w-3 h-3" /> Projet en retard
                       </span>
                     )}
                     {!overdue && overdueTasks > 0 && (
