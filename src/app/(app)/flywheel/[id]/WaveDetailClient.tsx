@@ -17,6 +17,11 @@ const RichTextEditor = dynamic(
   { ssr: false }
 );
 
+const WaveGanttTab = dynamic(
+  () => import("./tabs/WaveGanttTab").then((m) => m.WaveGanttTab),
+  { ssr: false }
+);
+
 const TABS = ["Résumé", "Milestones", "Gantt", "Fournisseurs"] as const;
 
 const STATUS_OPTIONS = [
@@ -92,13 +97,6 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
     })));
   }
 
-  // ── Gantt data ──────────────────────────────────────────────────────────────
-  const ganttMilestones = milestones.map((m) => {
-    const taskDates = m.tasks.map((t) => new Date(t.dueDate).getTime());
-    const mEnd = new Date(m.dueDate);
-    const mStart = m.startDate ? new Date(m.startDate) : taskDates.length > 0 ? new Date(Math.min(...taskDates)) : mEnd;
-    return { id: m.id, name: m.name, start: mStart, end: mEnd, tasks: m.tasks };
-  });
 
   return (
     <div className="flex flex-col h-full">
@@ -296,13 +294,11 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
 
         {/* ── Gantt ── */}
         {activeTab === "Gantt" && (
-          <div className="p-6">
-            {ganttMilestones.length === 0 ? (
-              <div className="text-center py-16 text-gray-400">Aucune phase à afficher dans le Gantt.</div>
-            ) : (
-              <WaveGantt milestones={ganttMilestones} waveName={wave.name} startDate={wave.startDate} endDate={wave.endDate} />
-            )}
-          </div>
+          <WaveGanttTab
+            milestones={milestones}
+            waveStart={wave.startDate}
+            waveEnd={wave.endDate}
+          />
         )}
 
         {/* ── Fournisseurs ── */}
@@ -330,61 +326,3 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
   );
 }
 
-// ── Gantt minimaliste ──────────────────────────────────────────────────────────
-function WaveGantt({ milestones, waveName, startDate, endDate }: {
-  milestones: { id: string; name: string; start: Date; end: Date; tasks: { id: string; name: string; startDate?: Date | null; dueDate: Date; status: string }[] }[];
-  waveName: string; startDate: Date; endDate: Date;
-}) {
-  const waveStart = new Date(startDate);
-  const waveEnd   = new Date(endDate);
-  const totalDays = Math.max(1, Math.ceil((waveEnd.getTime() - waveStart.getTime()) / 86400000));
-
-  function pct(date: Date) {
-    return Math.min(100, Math.max(0, ((new Date(date).getTime() - waveStart.getTime()) / 86400000 / totalDays) * 100));
-  }
-  function width(start: Date, end: Date) {
-    return Math.max(1, ((new Date(end).getTime() - new Date(start).getTime()) / 86400000 / totalDays) * 100);
-  }
-
-  const COLORS = ["bg-blue-400", "bg-purple-400", "bg-emerald-400", "bg-orange-400", "bg-pink-400"];
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100">
-        <h2 className="font-semibold text-gray-900 text-sm">{waveName} — Planning</h2>
-        <p className="text-xs text-gray-400 mt-0.5">{formatDate(startDate)} → {formatDate(endDate)}</p>
-      </div>
-      <div className="p-5 space-y-4">
-        {milestones.map((m, i) => (
-          <div key={m.id}>
-            <div className="flex items-center gap-3 mb-1.5">
-              <span className="text-sm font-medium text-gray-700 w-52 flex-shrink-0 truncate" title={m.name}>{m.name}</span>
-              <div className="flex-1 relative h-5 bg-gray-100 rounded-full">
-                <div
-                  className={`absolute h-5 rounded-full ${COLORS[i % COLORS.length]} opacity-80`}
-                  style={{ left: `${pct(m.start)}%`, width: `${width(m.start, m.end)}%` }}
-                />
-              </div>
-              <span className="text-xs text-gray-400 flex-shrink-0 w-20 text-right">{formatDate(m.end)}</span>
-            </div>
-            {m.tasks.map((t) => {
-              const tStart = t.startDate ?? m.start;
-              return (
-                <div key={t.id} className="flex items-center gap-3 mb-0.5 pl-4">
-                  <span className="text-xs text-gray-400 w-48 flex-shrink-0 truncate" title={t.name}>{t.name}</span>
-                  <div className="flex-1 relative h-3 bg-gray-50 rounded-full">
-                    <div
-                      className={`absolute h-3 rounded-full ${COLORS[i % COLORS.length]} opacity-40`}
-                      style={{ left: `${pct(tStart)}%`, width: `${width(tStart, t.dueDate)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-300 flex-shrink-0 w-20 text-right">{formatDate(t.dueDate)}</span>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
