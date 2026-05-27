@@ -7,9 +7,11 @@ import { useState, useRef, useEffect } from "react";
 import { cn, getRoleLabel } from "@/lib/utils";
 import {
   LayoutDashboard, FolderKanban, FileStack, LogOut,
-  ChevronRight, ChevronDown, Circle, CheckSquare, Settings, ShieldCheck, Check,
+  ChevronRight, ChevronDown, Circle, CheckSquare, Settings, ShieldCheck,
+  Check, Zap,
 } from "lucide-react";
 
+// ── Workspace definitions ────────────────────────────────────────────────────
 const WORKSPACES = [
   {
     id: "implementation",
@@ -23,12 +25,29 @@ const WORKSPACES = [
     id: "flywheel",
     name: "Consentio Flywheel",
     subtitle: "Activation fournisseurs",
-    href: "/flywheel",
+    href: "/flywheel/dashboard",
     color: "bg-emerald-600",
     letter: "F",
   },
 ];
 
+const HEALTH_COLORS: Record<string, string> = {
+  ON_TRACK: "text-green-400",
+  LATE: "text-red-400",
+  AT_RISK: "text-yellow-400",
+  BLOCKED: "text-red-600",
+  CANCELLED: "text-gray-400",
+  COMPLETED: "text-blue-400",
+};
+
+interface SidebarProps {
+  user: { name: string; email: string; role: string };
+  projects: { id: string; name: string; health: string }[];
+  templates: { id: string; name: string }[];
+  waves: { id: string; name: string; status: string }[];
+}
+
+// ── Workspace switcher ────────────────────────────────────────────────────────
 function WorkspaceSwitcher() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -93,37 +112,39 @@ function WorkspaceSwitcher() {
   );
 }
 
-const HEALTH_COLORS: Record<string, string> = {
-  ON_TRACK: "text-green-400",
-  LATE: "text-red-400",
-  AT_RISK: "text-yellow-400",
-  BLOCKED: "text-red-600",
-  CANCELLED: "text-gray-400",
-  COMPLETED: "text-blue-400",
-};
-
-interface SidebarProps {
-  user: { name: string; email: string; role: string };
-  projects: { id: string; name: string; health: string }[];
-  templates: { id: string; name: string }[];
-}
-
-export function Sidebar({ user, projects, templates }: SidebarProps) {
+// ── Main sidebar ──────────────────────────────────────────────────────────────
+export function Sidebar({ user, projects, templates, waves }: SidebarProps) {
   const pathname = usePathname();
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [wavesOpen, setWavesOpen] = useState(true);
 
-  const navItems = [
+  const isFlywheel = pathname.startsWith("/flywheel");
+
+  // ── Navigation items ───────────────────────────────────────────────────────
+  const implNavItems = [
     { href: "/dashboard",  label: "Dashboard",        icon: LayoutDashboard },
     { href: "/mes-taches", label: "Mes tâches",        icon: CheckSquare },
     { href: "/projects",   label: "Tous les projets",  icon: FolderKanban },
-    ...(user.role !== "MEMBER"
-      ? [{ href: "/templates", label: "Templates", icon: FileStack }]
-      : []),
-    ...(user.role === "ADMIN"
-      ? [{ href: "/admin", label: "Administration", icon: ShieldCheck }]
-      : []),
+    ...(user.role !== "MEMBER" ? [{ href: "/templates", label: "Templates", icon: FileStack }] : []),
+    ...(user.role === "ADMIN"  ? [{ href: "/admin",     label: "Administration", icon: ShieldCheck }] : []),
   ];
+
+  const flywheelNavItems = [
+    { href: "/flywheel/dashboard", label: "Dashboard",           icon: LayoutDashboard },
+    { href: "/flywheel",           label: "Vagues d'activation", icon: Zap },
+    ...(user.role !== "MEMBER" ? [{ href: "/flywheel/templates", label: "Templates",    icon: FileStack }] : []),
+    ...(user.role === "ADMIN"  ? [{ href: "/admin",              label: "Administration", icon: ShieldCheck }] : []),
+  ];
+
+  const navItems = isFlywheel ? flywheelNavItems : implNavItems;
+
+  function isActive(href: string, exact = false) {
+    if (exact) return pathname === href;
+    // For the wave list, only active when exactly /flywheel
+    if (href === "/flywheel") return pathname === "/flywheel";
+    return pathname === href || pathname.startsWith(href + "/");
+  }
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
@@ -132,19 +153,20 @@ export function Sidebar({ user, projects, templates }: SidebarProps) {
         <WorkspaceSwitcher />
       </div>
 
-      {/* Nav + sections scrollables */}
+      {/* Nav + scrollable sections */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        {/* Nav principale */}
         {navItems.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href;
+          const active = isActive(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
                 "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                active ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                active
+                  ? isFlywheel ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               )}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
@@ -153,8 +175,8 @@ export function Sidebar({ user, projects, templates }: SidebarProps) {
           );
         })}
 
-        {/* Section Projets actifs */}
-        {projects.length > 0 && (
+        {/* ── Implementation: active projects ──────────────────────────── */}
+        {!isFlywheel && projects.length > 0 && (
           <div className="pt-2">
             <button
               onClick={() => setProjectsOpen((o) => !o)}
@@ -186,8 +208,8 @@ export function Sidebar({ user, projects, templates }: SidebarProps) {
           </div>
         )}
 
-        {/* Section Templates */}
-        {templates.length > 0 && (
+        {/* ── Implementation: templates ─────────────────────────────────── */}
+        {!isFlywheel && templates.length > 0 && (
           <div className="pt-2">
             <button
               onClick={() => setTemplatesOpen((o) => !o)}
@@ -208,6 +230,39 @@ export function Sidebar({ user, projects, templates }: SidebarProps) {
                     <span className="truncate">{t.name}</span>
                   </Link>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Flywheel: active waves ────────────────────────────────────── */}
+        {isFlywheel && waves.length > 0 && (
+          <div className="pt-2">
+            <button
+              onClick={() => setWavesOpen((o) => !o)}
+              className="flex items-center gap-2 px-3 py-1.5 w-full text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors"
+            >
+              {wavesOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              Vagues actives
+            </button>
+            {wavesOpen && (
+              <div className="mt-0.5 space-y-0.5">
+                {waves.map((w) => {
+                  const active = pathname === `/flywheel/${w.id}` || pathname.startsWith(`/flywheel/${w.id}/`);
+                  return (
+                    <Link
+                      key={w.id}
+                      href={`/flywheel/${w.id}`}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors",
+                        active ? "bg-emerald-50 text-emerald-700" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      )}
+                    >
+                      <Zap className="w-3 h-3 flex-shrink-0 text-emerald-400" />
+                      <span className="truncate flex-1">{w.name}</span>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>

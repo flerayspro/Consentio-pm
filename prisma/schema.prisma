@@ -46,6 +46,40 @@ model Tag {
   projects Project[] @relation("ProjectTags")
 }
 
+model WaveTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  createdById String
+  createdBy   User     @relation("CreatedWaveTemplates", fields: [createdById], references: [id])
+  milestones  WaveTemplateMilestone[]
+  waves       Wave[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WaveTemplateMilestone {
+  id         String              @id @default(cuid())
+  name       String
+  owner      String              @default("Consentio")
+  order      Int                 @default(0)
+  offsetDays Int                 @default(0)
+  templateId String
+  template   WaveTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  tasks      WaveTemplateTask[]
+}
+
+model WaveTemplateTask {
+  id           String                @id @default(cuid())
+  name         String
+  owner        String                @default("Consentio")
+  order        Int                   @default(0)
+  durationDays Int                   @default(0)
+  milestoneId  String
+  milestone    WaveTemplateMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -56,12 +90,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  managedProjects  Project[]        @relation("ProjectManager")
-  ownedTasks       Task[]           @relation("TaskOwner")
-  createdTemplates ProjectTemplate[]
-  comments         TaskComment[]    @relation("CommentAuthor")
-  uploadedFiles    TaskFile[]       @relation("FileUploader")
-  managedWaves     Wave[]           @relation("WaveManager")
+  managedProjects      Project[]        @relation("ProjectManager")
+  ownedTasks           Task[]           @relation("TaskOwner")
+  createdTemplates     ProjectTemplate[]
+  comments             TaskComment[]    @relation("CommentAuthor")
+  uploadedFiles        TaskFile[]       @relation("FileUploader")
+  managedWaves         Wave[]           @relation("WaveManager")
+  createdWaveTemplates WaveTemplate[]   @relation("CreatedWaveTemplates")
 }
 
 model ProjectTemplate {
@@ -173,19 +208,21 @@ model TaskComment {
 // ─── Flywheel Activation ─────────────────────────────────────────────────────
 
 model Wave {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
   clientName  String
-  status      String   @default("ACTIVE")   // ACTIVE | COMPLETED | ON_HOLD | CANCELLED
+  status      String        @default("ACTIVE")   // ACTIVE | COMPLETED | ON_HOLD | CANCELLED
   startDate   DateTime
   endDate     DateTime
   summary     String?
   managerId   String
-  manager     User     @relation("WaveManager", fields: [managerId], references: [id])
+  manager     User          @relation("WaveManager", fields: [managerId], references: [id])
+  templateId  String?
+  template    WaveTemplate? @relation(fields: [templateId], references: [id])
   milestones  WaveMilestone[]
   suppliers   WaveSupplier[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 model WaveMilestone {

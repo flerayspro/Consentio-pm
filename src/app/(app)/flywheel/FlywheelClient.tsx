@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Users, CheckCircle2, ChevronRight, Zap } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+
+interface WaveTemplate { id: string; name: string; description: string | null; isDefault: boolean; }
 
 interface WaveCard {
   id: string;
@@ -42,10 +44,22 @@ export function FlywheelClient({ waves, users, currentUserId }: {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [templates, setTemplates] = useState<WaveTemplate[]>([]);
   const [form, setForm] = useState({
     name: "", clientName: "", startDate: "", endDate: "",
-    managerId: currentUserId, useTemplate: true,
+    managerId: currentUserId, templateId: "",
   });
+
+  useEffect(() => {
+    fetch("/api/flywheel/templates")
+      .then((r) => r.json())
+      .then((data: WaveTemplate[]) => {
+        setTemplates(data);
+        const def = data.find((t) => t.isDefault);
+        if (def) setForm((f) => ({ ...f, templateId: def.id }));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -54,7 +68,14 @@ export function FlywheelClient({ waves, users, currentUserId }: {
       const res = await fetch("/api/waves", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          name: form.name,
+          clientName: form.clientName,
+          startDate: form.startDate,
+          endDate: form.endDate,
+          managerId: form.managerId,
+          templateId: form.templateId || undefined,
+        }),
       });
       if (res.ok) {
         const wave = await res.json();
@@ -207,18 +228,25 @@ export function FlywheelClient({ waves, users, currentUserId }: {
                 </select>
               </div>
               <div>
-                <label className="flex items-center gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.useTemplate}
-                    onChange={(e) => setForm({ ...form, useTemplate: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Utiliser le template standard</p>
-                    <p className="text-xs text-gray-400">Pré-remplit les 5 phases d'activation avec leurs tâches (Collecte données, Mobilisation, Paramétrage, Formation, Déploiement)</p>
-                  </div>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Template</label>
+                <select
+                  value={form.templateId}
+                  onChange={(e) => setForm({ ...form, templateId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">— Aucun template (vague vide) —</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.isDefault ? "⭐ " : ""}{t.name}{t.description ? ` — ${t.description}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {form.templateId && (() => {
+                  const tpl = templates.find((t) => t.id === form.templateId);
+                  return tpl?.description ? (
+                    <p className="text-xs text-gray-400 mt-1">{tpl.description}</p>
+                  ) : null;
+                })()}
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)}
