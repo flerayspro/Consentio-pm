@@ -9,14 +9,20 @@ export default async function AdminPage() {
   if (!session) redirect("/login");
   if (session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const users = await prisma.user.findMany({
-    select: {
-      id: true, name: true, email: true,
-      role: true, position: true, createdAt: true,
-      _count: { select: { managedProjects: true, ownedTasks: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const [users, tags] = await Promise.all([
+    prisma.user.findMany({
+      select: {
+        id: true, name: true, email: true,
+        role: true, position: true, createdAt: true,
+        _count: { select: { managedProjects: true, ownedTasks: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.tag.findMany({
+      orderBy: { name: "asc" },
+      include: { _count: { select: { projects: true } } },
+    }),
+  ]);
 
-  return <AdminClient users={users} currentUserId={session.user.id} />;
+  return <AdminClient users={users} tags={tags} currentUserId={session.user.id} />;
 }

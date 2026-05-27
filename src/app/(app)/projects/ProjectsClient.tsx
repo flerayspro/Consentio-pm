@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatDate, isOverdue, getStatusLabel } from "@/lib/utils";
 import { Plus, Search, AlertTriangle, CheckCircle2, Clock, ChevronRight } from "lucide-react";
+import { TagBadge } from "@/components/ui/TagBadge";
 import { isBefore } from "date-fns";
 
 interface Task { id: string; status: string; dueDate: Date; }
 interface Milestone { id: string; tasks: Task[]; }
+interface TagItem { id: string; name: string; color: string; }
 interface Project {
   id: string; name: string; description?: string | null;
   status: string; health: string; startDate: Date; endDate: Date;
   manager: { id: string; name: string };
   milestones: Milestone[];
+  tags: TagItem[];
 }
 
 const HEALTH_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
@@ -26,6 +29,7 @@ const HEALTH_CONFIG: Record<string, { label: string; color: string; dot: string 
 };
 interface User { id: string; name: string; email: string; }
 interface Template { id: string; name: string; }
+interface TagDef { id: string; name: string; color: string; }
 
 function getProgress(project: Project) {
   const tasks = project.milestones.flatMap((m) => m.tasks);
@@ -41,9 +45,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function ProjectsClient({
-  projects, users, templates, currentUserRole, currentUserId,
+  projects, users, templates, allTags, currentUserRole, currentUserId,
 }: {
-  projects: Project[]; users: User[]; templates: Template[];
+  projects: Project[]; users: User[]; templates: Template[]; allTags: TagDef[];
   currentUserRole: string; currentUserId: string;
 }) {
   const router = useRouter();
@@ -53,7 +57,7 @@ export function ProjectsClient({
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
     name: "", description: "", startDate: "", endDate: "",
-    managerId: currentUserId, templateId: "",
+    managerId: currentUserId, templateId: "", tagIds: [] as string[],
   });
 
   const filtered = projects.filter((p) => {
@@ -69,7 +73,11 @@ export function ProjectsClient({
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, templateId: form.templateId || undefined }),
+        body: JSON.stringify({
+          ...form,
+          templateId: form.templateId || undefined,
+          tagIds: form.tagIds.length > 0 ? form.tagIds : undefined,
+        }),
       });
       if (res.ok) {
         const project = await res.json();
@@ -169,7 +177,14 @@ export function ProjectsClient({
                     )}
                   </div>
                   {project.description && (
-                    <p className="text-sm text-gray-500 mb-3 truncate">{project.description}</p>
+                    <p className="text-sm text-gray-500 mb-2 truncate">{project.description}</p>
+                  )}
+                  {project.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {project.tags.map((tag) => (
+                        <TagBadge key={tag.id} name={tag.name} color={tag.color} size="sm" />
+                      ))}
+                    </div>
                   )}
                   <div className="flex items-center gap-4 text-xs text-gray-400">
                     <span>Chef: {project.manager.name}</span>
@@ -250,6 +265,27 @@ export function ProjectsClient({
                   ))}
                 </select>
               </div>
+              {allTags.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.map((tag) => {
+                      const selected = form.tagIds.includes(tag.id);
+                      return (
+                        <button key={tag.id} type="button"
+                          onClick={() => setForm((f) => ({
+                            ...f,
+                            tagIds: selected ? f.tagIds.filter((id) => id !== tag.id) : [...f.tagIds, tag.id],
+                          }))}
+                          className={`transition-all ${selected ? "ring-2 ring-offset-1 ring-gray-400" : "opacity-60 hover:opacity-100"}`}
+                        >
+                          <TagBadge name={tag.name} color={tag.color} size="sm" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {templates.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -3,12 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { formatDate, getStatusLabel } from "@/lib/utils";
-import { ChevronLeft, ChevronDown, User, Calendar, Save, Pencil, LayoutTemplate } from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import { ChevronLeft, ChevronDown, User, Calendar, Save, Pencil, LayoutTemplate, Tag, Plus, X } from "lucide-react";
 import { MilestonesTab } from "./tabs/MilestonesTab";
 import { ResourcesTab } from "./tabs/ResourcesTab";
 import { TaskPanel } from "./TaskPanel";
 import { GanttClient } from "./gantt/GanttClient";
+import { TagBadge } from "@/components/ui/TagBadge";
 
 const RichTextEditor = dynamic(
   () => import("@/components/editor/RichTextEditor").then((m) => m.RichTextEditor),
@@ -29,6 +30,7 @@ const TABS = ["Résumé", "Milestones", "Gantt", "Ressources"] as const;
 interface Owner { id: string; name: string; }
 interface Task { id: string; name: string; description?: string | null; status: string; dueDate: Date; owner?: Owner | null; order: number; }
 interface Milestone { id: string; name: string; description?: string | null; status: string; dueDate: Date; order: number; tasks: Task[]; }
+interface TagItem { id: string; name: string; color: string; }
 interface Project {
   id: string; name: string; description?: string | null; status: string;
   health: string; summary?: string | null;
@@ -36,13 +38,14 @@ interface Project {
   manager: { id: string; name: string; email: string };
   template?: { id: string; name: string } | null;
   milestones: Milestone[];
+  tags: TagItem[];
 }
 interface User { id: string; name: string; email: string; role: string; }
 
 export function ProjectDetailClient({
-  project, users, currentUserRole, currentUserId,
+  project, users, allTags, currentUserRole, currentUserId,
 }: {
-  project: Project; users: User[]; currentUserRole: string; currentUserId: string;
+  project: Project; users: User[]; allTags: TagItem[]; currentUserRole: string; currentUserId: string;
 }) {
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Résumé");
   const [milestones, setMilestones] = useState(project.milestones);
@@ -54,6 +57,9 @@ export function ProjectDetailClient({
   const [manager, setManager] = useState(project.manager);
   const [editingManager, setEditingManager] = useState(false);
   const [managerSaving, setManagerSaving] = useState(false);
+  const [projectTags, setProjectTags] = useState<TagItem[]>(project.tags);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [tagSaving, setTagSaving] = useState(false);
 
   const allTasks = milestones.flatMap((m) => m.tasks);
   const doneTasks = allTasks.filter((t) => t.status === "DONE").length;
@@ -98,6 +104,19 @@ export function ProjectDetailClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ health: newHealth }),
     });
+  }
+
+  async function toggleTag(tag: TagItem) {
+    const has = projectTags.some((t) => t.id === tag.id);
+    const next = has ? projectTags.filter((t) => t.id !== tag.id) : [...projectTags, tag];
+    setProjectTags(next);
+    setTagSaving(true);
+    await fetch(`/api/projects/${project.id}/tags`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagIds: next.map((t) => t.id) }),
+    });
+    setTagSaving(false);
   }
 
   return (
@@ -314,6 +333,72 @@ export function ProjectDetailClient({
                   <p className="text-xs text-green-600 font-medium mt-2">Toutes les tâches sont terminées !</p>
                 )}
               </div>
+
+              {/* Tags */}
+              {allTags.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <Tag className="w-3 h-3" /> Tags
+                    </p>
+                    {currentUserRole !== "MEMBER" && (
+                      <button
+                        onClick={() => setShowTagPicker((v) => !v)}
+                        className="p-1 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                        title="Gérer les tags"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Current tags */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {projectTags.length === 0 && !showTagPicker && (
+                      <p className="text-xs text-gray-300">Aucun tag</p>
+                    )}
+                    {projectTags.map((tag) => (
+                      <div key={tag.id} className="group relative">
+                        <TagBadge name={tag.name} color={tag.color} size="sm" />
+                        {currentUserRole !== "MEMBER" && (
+                          <button
+                            onClick={() => toggleTag(tag)}
+                            disabled={tagSaving}
+                            className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gray-500 hover:bg-red-500 text-white rounded-full text-xs hidden group-hover:flex items-center justify-center transition-colors"
+                          >
+                            <X className="w-2 h-2" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tag picker dropdown */}
+                  {showTagPicker && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <p className="text-xs text-gray-400 mb-1.5">Ajouter un tag :</p>
+                      <div className="flex flex-col gap-1">
+                        {allTags
+                          .filter((t) => !projectTags.some((pt) => pt.id === t.id))
+                          .map((tag) => (
+                            <button
+                              key={tag.id}
+                              onClick={() => toggleTag(tag)}
+                              disabled={tagSaving}
+                              className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors text-left disabled:opacity-60"
+                            >
+                              <TagBadge name={tag.name} color={tag.color} size="sm" />
+                            </button>
+                          ))
+                        }
+                        {allTags.filter((t) => !projectTags.some((pt) => pt.id === t.id)).length === 0 && (
+                          <p className="text-xs text-gray-300 px-2">Tous les tags sont ajoutés</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           </div>

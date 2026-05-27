@@ -6,7 +6,167 @@ import {
   ShieldCheck, Users, UserPlus, Trash2, KeyRound,
   Copy, Check, AlertCircle, X, Mail, Briefcase,
   FolderKanban, CheckSquare2, Crown, ChevronDown,
+  Tag, Plus, Pencil,
 } from "lucide-react";
+import { TagBadge } from "@/components/ui/TagBadge";
+
+interface TagRow {
+  id: string;
+  name: string;
+  color: string;
+  _count: { projects: number };
+}
+
+const PALETTE = [
+  "#3b82f6","#6366f1","#8b5cf6","#a855f7","#ec4899",
+  "#ef4444","#f97316","#f59e0b","#84cc16","#22c55e",
+  "#14b8a6","#0ea5e9","#6b7280","#d946ef","#10b981",
+];
+
+// ── Section Tags ──────────────────────────────────────────────────────────
+function TagsSection({ initialTags }: { initialTags: TagRow[] }) {
+  const [tags, setTags] = useState(initialTags);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: "", color: PALETTE[0] });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function startEdit(tag: TagRow) {
+    setEditingId(tag.id);
+    setForm({ name: tag.name, color: tag.color });
+    setShowForm(false);
+  }
+
+  function cancelForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setForm({ name: "", color: PALETTE[0] });
+    setError("");
+  }
+
+  async function saveTag(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setError("");
+    if (editingId) {
+      const res = await fetch(`/api/admin/tags/${editingId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTags((prev) => prev.map((t) => t.id === editingId ? updated : t));
+        cancelForm();
+      } else setError("Erreur lors de la mise à jour");
+    } else {
+      const res = await fetch("/api/admin/tags", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setTags((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        cancelForm();
+      } else {
+        const data = await res.json();
+        setError(typeof data.error === "string" ? data.error : "Erreur lors de la création");
+      }
+    }
+    setSaving(false);
+  }
+
+  async function deleteTag(tag: TagRow) {
+    if (!confirm(`Supprimer le tag "${tag.name}" ? Il sera retiré de tous les projets.`)) return;
+    const res = await fetch(`/api/admin/tags/${tag.id}`, { method: "DELETE" });
+    if (res.ok) setTags((prev) => prev.filter((t) => t.id !== tag.id));
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Tag className="w-4 h-4 text-gray-400" />
+          <h2 className="font-semibold text-gray-900">Tags projets</h2>
+          <span className="text-sm text-gray-400">({tags.length})</span>
+        </div>
+        {!showForm && !editingId && (
+          <button onClick={() => { setShowForm(true); setEditingId(null); setForm({ name: "", color: PALETTE[0] }); }}
+            className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Nouveau tag
+          </button>
+        )}
+      </div>
+
+      {/* Formulaire création / édition */}
+      {(showForm || editingId) && (
+        <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
+          <form onSubmit={saveTag} className="space-y-3">
+            <p className="text-sm font-medium text-gray-700">{editingId ? "Modifier le tag" : "Nouveau tag"}</p>
+            <div className="flex gap-3 items-start">
+              <div className="flex-1">
+                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Nom du tag (ex: Magic Orders)"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+              </div>
+              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2">
+                <span className="text-xs text-gray-400 mr-1">Couleur :</span>
+                {PALETTE.map((c) => (
+                  <button key={c} type="button" onClick={() => setForm({ ...form, color: c })}
+                    title={c}
+                    className={`w-5 h-5 rounded-full transition-transform hover:scale-125 ${form.color === c ? "ring-2 ring-offset-1 ring-gray-400 scale-110" : ""}`}
+                    style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Aperçu :</span>
+              <TagBadge name={form.name || "Nom du tag"} color={form.color} />
+            </div>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <div className="flex gap-2">
+              <button type="submit" disabled={saving}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors">
+                {saving ? "..." : editingId ? "Enregistrer" : "Créer"}
+              </button>
+              <button type="button" onClick={cancelForm}
+                className="px-4 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                Annuler
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Liste */}
+      {tags.length === 0 && !showForm ? (
+        <div className="px-6 py-10 text-center text-gray-400 text-sm">
+          Aucun tag — créez-en un pour commencer
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {tags.map((tag) => (
+            <div key={tag.id} className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 transition-colors">
+              <TagBadge name={tag.name} color={tag.color} />
+              <span className="text-xs text-gray-400 flex-1">
+                {tag._count.projects} projet{tag._count.projects !== 1 ? "s" : ""}
+              </span>
+              <div className="flex gap-1">
+                <button onClick={() => startEdit(tag)}
+                  className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => deleteTag(tag)}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface UserRow {
   id: string;
@@ -217,8 +377,9 @@ function InviteModal({ onClose, onCreated }: {
 }
 
 // ── Composant principal ────────────────────────────────────────────────────
-export function AdminClient({ users: initialUsers, currentUserId }: {
+export function AdminClient({ users: initialUsers, tags, currentUserId }: {
   users: UserRow[];
+  tags: TagRow[];
   currentUserId: string;
 }) {
   const [users, setUsers] = useState(initialUsers);
@@ -393,6 +554,9 @@ export function AdminClient({ users: initialUsers, currentUserId }: {
               ))}
             </div>
           </div>
+
+          {/* Tags */}
+          <TagsSection initialTags={tags} />
 
           {/* Légende rôles */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5">

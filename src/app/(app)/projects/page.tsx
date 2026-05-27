@@ -10,12 +10,13 @@ export default async function ProjectsPage() {
   const where =
     session.user.role === "PROJECT_MANAGER" ? { managerId: session.user.id } : {};
 
-  const [projects, users, templates] = await Promise.all([
+  const [projects, users, templates, allTags] = await Promise.all([
     prisma.project.findMany({
       where,
       include: {
         manager: { select: { id: true, name: true } },
         milestones: { include: { tasks: true } },
+        tags: { select: { id: true, name: true, color: true } },
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -28,6 +29,7 @@ export default async function ProjectsPage() {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    prisma.tag.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -35,6 +37,7 @@ export default async function ProjectsPage() {
       projects={projects}
       users={users}
       templates={templates}
+      allTags={allTags}
       currentUserRole={session.user.role}
       currentUserId={session.user.id}
     />

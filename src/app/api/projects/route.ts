@@ -12,6 +12,7 @@ const createProjectSchema = z.object({
   endDate: z.string(),
   managerId: z.string(),
   templateId: z.string().optional(),
+  tagIds: z.array(z.string()).optional(),
 });
 
 export async function GET() {
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success)
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { name, description, startDate, endDate, managerId, templateId } = parsed.data;
+  const { name, description, startDate, endDate, managerId, templateId, tagIds } = parsed.data;
 
   let milestonesData: Parameters<typeof prisma.project.create>[0]["data"]["milestones"] =
     undefined;
@@ -92,6 +93,9 @@ export async function POST(req: NextRequest) {
       managerId,
       templateId,
       milestones: milestonesData,
+      tags: tagIds && tagIds.length > 0
+        ? { connect: tagIds.map((tid) => ({ id: tid })) }
+        : undefined,
     },
     include: {
       manager: { select: { id: true, name: true } },
