@@ -61,6 +61,7 @@ model User {
   createdTemplates ProjectTemplate[]
   comments         TaskComment[]    @relation("CommentAuthor")
   uploadedFiles    TaskFile[]       @relation("FileUploader")
+  managedWaves     Wave[]           @relation("WaveManager")
 }
 
 model ProjectTemplate {
@@ -167,6 +168,78 @@ model TaskComment {
   taskId   String
   author   User   @relation("CommentAuthor", fields: [authorId], references: [id])
   authorId String
+}
+
+// ─── Flywheel Activation ─────────────────────────────────────────────────────
+
+model Wave {
+  id          String   @id @default(cuid())
+  name        String
+  clientName  String
+  status      String   @default("ACTIVE")   // ACTIVE | COMPLETED | ON_HOLD | CANCELLED
+  startDate   DateTime
+  endDate     DateTime
+  summary     String?
+  managerId   String
+  manager     User     @relation("WaveManager", fields: [managerId], references: [id])
+  milestones  WaveMilestone[]
+  suppliers   WaveSupplier[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WaveMilestone {
+  id        String     @id @default(cuid())
+  waveId    String
+  wave      Wave       @relation(fields: [waveId], references: [id], onDelete: Cascade)
+  name      String
+  owner     String     @default("Consentio")   // Consentio | Client | Fournisseurs
+  order     Int        @default(0)
+  startDate DateTime?
+  dueDate   DateTime
+  status    String     @default("TODO")        // TODO | IN_PROGRESS | DONE
+  tasks     WaveTask[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model WaveTask {
+  id          String        @id @default(cuid())
+  milestoneId String
+  milestone   WaveMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  name        String
+  owner       String        @default("Consentio")
+  order       Int           @default(0)
+  startDate   DateTime?
+  dueDate     DateTime
+  status      String        @default("TODO")
+  pctComplete Float         @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model WaveSupplier {
+  id                String   @id @default(cuid())
+  waveId            String
+  wave              Wave     @relation(fields: [waveId], references: [id], onDelete: Cascade)
+  supplierName      String
+  supplierCode      String?
+  email             String?
+  firstName         String?
+  lastName          String?
+  phone             String?
+  language          String?
+  status            String   @default("NEW")           // NEW | ALREADY_HAS_WS | NOT_NEW | IN_HUBSPOT_ONLY
+  workspaceId       String?
+  action            String   @default("TO_CONTACT")    // TO_CONTACT | NO_NEED | CONNECTED | ATTEMPTED
+  comments          String?
+  accountCreated    Boolean  @default(false)
+  registeredWebinar Boolean  @default(false)
+  assistedWebinar   Boolean  @default(false)
+  configured        Boolean  @default(false)
+  productFamilies   String[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model TaskFile {
