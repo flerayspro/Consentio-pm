@@ -42,7 +42,7 @@ interface WaveSupplier {
   id: string; waveId: string; supplierName: string; supplierCode: string | null;
   email: string | null; firstName: string | null; lastName: string | null;
   phone: string | null; language: string | null; status: string; workspaceId: string | null;
-  action: string; comments: string | null; accountCreated: boolean;
+  action: string; callAttempts: number; comments: string | null; accountCreated: boolean;
   registeredWebinar: boolean; assistedWebinar: boolean; configured: boolean; productFamilies: string[];
 }
 interface Wave {

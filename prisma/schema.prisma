@@ -286,6 +286,7 @@ model WaveSupplier {
   status            String   @default("NEW")           // NEW | ALREADY_HAS_WS | NOT_NEW | IN_HUBSPOT_ONLY
   workspaceId       String?
   action            String   @default("TO_CONTACT")    // TO_CONTACT | NO_NEED | CONNECTED | ATTEMPTED
+  callAttempts      Int      @default(0)
   comments          String?
   accountCreated    Boolean  @default(false)
   registeredWebinar Boolean  @default(false)

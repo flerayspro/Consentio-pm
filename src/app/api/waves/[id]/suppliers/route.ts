@@ -15,6 +15,7 @@ const createSchema = z.object({
   status: z.string().optional(),
   workspaceId: z.string().optional(),
   action: z.string().optional(),
+  callAttempts: z.number().int().min(0).optional(),
   comments: z.string().optional(),
   productFamilies: z.array(z.string()).optional(),
 });

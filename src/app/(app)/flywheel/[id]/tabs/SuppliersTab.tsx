@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import {
   Upload, Plus, Trash2, Search, X, CheckCircle2, XCircle,
   ChevronDown, Users, Phone, Globe, MessageSquare, Building2,
+  Minus,
 } from "lucide-react";
 
 interface Supplier {
@@ -11,7 +12,9 @@ interface Supplier {
   supplierName: string; supplierCode: string | null;
   email: string | null; firstName: string | null; lastName: string | null;
   phone: string | null; language: string | null;
-  status: string; workspaceId: string | null; action: string; comments: string | null;
+  status: string; workspaceId: string | null; action: string;
+  callAttempts: number;
+  comments: string | null;
   accountCreated: boolean; registeredWebinar: boolean; assistedWebinar: boolean; configured: boolean;
   productFamilies: string[];
 }
@@ -96,18 +99,21 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
 
   const filtered = suppliers.filter((s) => {
     const q = search.toLowerCase();
-    const matchSearch = !q || s.supplierName.toLowerCase().includes(q) || (s.email ?? "").toLowerCase().includes(q);
+    const matchSearch = !q
+      || s.supplierName.toLowerCase().includes(q)
+      || (s.email ?? "").toLowerCase().includes(q)
+      || (s.supplierCode ?? "").toLowerCase().includes(q);
     const matchStatus = filterStatus === "ALL" || s.status === filterStatus;
     const matchAction = filterAction === "ALL" || s.action === filterAction;
     return matchSearch && matchStatus && matchAction;
   });
 
   // KPIs
-  const total          = suppliers.length;
-  const withAccount    = suppliers.filter((s) => s.accountCreated).length;
-  const registeredWeb  = suppliers.filter((s) => s.registeredWebinar).length;
-  const trainedWeb     = suppliers.filter((s) => s.assistedWebinar).length;
-  const configured     = suppliers.filter((s) => s.configured).length;
+  const total         = suppliers.length;
+  const withAccount   = suppliers.filter((s) => s.accountCreated).length;
+  const registeredWeb = suppliers.filter((s) => s.registeredWebinar).length;
+  const trainedWeb    = suppliers.filter((s) => s.assistedWebinar).length;
+  const configured    = suppliers.filter((s) => s.configured).length;
 
   async function toggleField(s: Supplier, field: keyof Pick<Supplier, "accountCreated"|"registeredWebinar"|"assistedWebinar"|"configured">) {
     if (!canEdit) return;
@@ -147,8 +153,11 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
       const s = await res.json();
       setSuppliers((prev) => [...prev, s].sort((a, b) => a.supplierName.localeCompare(b.supplierName)));
       setShowAddModal(false);
-      setForm({ supplierName: "", supplierCode: "", email: "", firstName: "", lastName: "",
-        phone: "", language: "FR", status: "NEW", workspaceId: "", action: "TO_CONTACT", comments: "", productFamilies: [] });
+      setForm({
+        supplierName: "", supplierCode: "", email: "", firstName: "", lastName: "",
+        phone: "", language: "FR", status: "NEW", workspaceId: "", action: "TO_CONTACT",
+        comments: "", productFamilies: [],
+      });
     }
     setSaving(null);
   }
@@ -178,11 +187,11 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
       {/* KPI Bar */}
       <div className="grid grid-cols-5 gap-3">
         {[
-          { label: "Total fournisseurs",    value: total,       color: "bg-gray-50  border-gray-200  text-gray-700",    icon: <Building2 className="w-4 h-4 text-gray-400" /> },
-          { label: "Compte créé",           value: withAccount, color: "bg-blue-50  border-blue-100  text-blue-700",   icon: <CheckCircle2 className="w-4 h-4 text-blue-400" /> },
-          { label: "Inscrit webinaire",     value: registeredWeb, color: "bg-yellow-50 border-yellow-100 text-yellow-700", icon: <Users className="w-4 h-4 text-yellow-400" /> },
-          { label: "Formés (webinaire)",    value: trainedWeb,  color: "bg-orange-50 border-orange-100 text-orange-700", icon: <Users className="w-4 h-4 text-orange-400" /> },
-          { label: "Configurés",            value: configured,  color: "bg-emerald-50 border-emerald-100 text-emerald-700", icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" /> },
+          { label: "Total fournisseurs", value: total,        color: "bg-gray-50  border-gray-200  text-gray-700",    icon: <Building2 className="w-4 h-4 text-gray-400" /> },
+          { label: "Compte créé",        value: withAccount,  color: "bg-blue-50  border-blue-100  text-blue-700",   icon: <CheckCircle2 className="w-4 h-4 text-blue-400" /> },
+          { label: "Inscrit webinaire",  value: registeredWeb,color: "bg-yellow-50 border-yellow-100 text-yellow-700",icon: <Users className="w-4 h-4 text-yellow-400" /> },
+          { label: "Formés (webinaire)", value: trainedWeb,   color: "bg-orange-50 border-orange-100 text-orange-700",icon: <Users className="w-4 h-4 text-orange-400" /> },
+          { label: "Configurés",         value: configured,   color: "bg-emerald-50 border-emerald-100 text-emerald-700", icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" /> },
         ].map(({ label, value, color, icon }) => (
           <div key={label} className={`rounded-xl border p-4 ${color}`}>
             <div className="flex items-center gap-2 mb-1">{icon}<span className="text-xs font-medium">{label}</span></div>
@@ -239,6 +248,7 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fournisseur</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Compte</th>
@@ -252,7 +262,7 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 && (
-                <tr><td colSpan={10} className="text-center py-12 text-gray-400">Aucun fournisseur trouvé</td></tr>
+                <tr><td colSpan={11} className="text-center py-12 text-gray-400">Aucun fournisseur trouvé</td></tr>
               )}
               {filtered.map((s) => (
                 <SupplierRow
@@ -294,6 +304,19 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Code fournisseur</label>
+                  <input value={form.supplierCode} onChange={(e) => setForm({ ...form, supplierCode: e.target.value })}
+                    placeholder="Ex: SUP-001"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Workspace ID</label>
+                  <input value={form.workspaceId} onChange={(e) => setForm({ ...form, workspaceId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
                   <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
@@ -321,18 +344,6 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                     {["FR","EN","ES","IT","DE","NL","PT","BE"].map((l) => <option key={l}>{l}</option>)}
                   </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Code fournisseur</label>
-                  <input value={form.supplierCode} onChange={(e) => setForm({ ...form, supplierCode: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Workspace ID</label>
-                  <input value={form.workspaceId} onChange={(e) => setForm({ ...form, workspaceId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -385,11 +396,25 @@ function SupplierRow({
   onDelete: (id: string) => void;
 }) {
   const isEditing = editingId === s.id;
-  const [comment, setComment] = useState(s.comments ?? "");
+  const [comment, setComment]         = useState(s.comments ?? "");
+  const [supplierCode, setSupplierCode] = useState(s.supplierCode ?? "");
+  const [wsId, setWsId]               = useState(s.workspaceId ?? "");
 
   function saveComment() {
     onPatch(s.id, { comments: comment || null });
     setEditingId(null);
+  }
+
+  function saveSupplierCode() {
+    if (supplierCode !== (s.supplierCode ?? "")) {
+      onPatch(s.id, { supplierCode: supplierCode || null });
+    }
+  }
+
+  function saveWsId() {
+    if (wsId !== (s.workspaceId ?? "")) {
+      onPatch(s.id, { workspaceId: wsId || null });
+    }
   }
 
   return (
@@ -407,6 +432,21 @@ function SupplierRow({
             {s.language && <span className="text-xs text-gray-300 flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" />{s.language}</span>}
           </div>
         </div>
+      </td>
+
+      {/* Code fournisseur */}
+      <td className="px-3 py-3">
+        {canEdit ? (
+          <input
+            value={supplierCode}
+            onChange={(e) => setSupplierCode(e.target.value)}
+            onBlur={saveSupplierCode}
+            placeholder="—"
+            className="w-24 text-xs px-2 py-1.5 border border-transparent hover:border-gray-200 focus:border-emerald-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-400 text-gray-700 bg-transparent hover:bg-white focus:bg-white transition-colors"
+          />
+        ) : (
+          <span className="text-xs text-gray-500 font-mono">{s.supplierCode || "—"}</span>
+        )}
       </td>
 
       {/* Statut */}
@@ -427,28 +467,71 @@ function SupplierRow({
         )}
       </td>
 
-      {/* Action */}
+      {/* Action + compteur tentatives */}
       <td className="px-3 py-3">
         {canEdit ? (
-          <select
-            value={s.action}
-            onChange={(e) => onPatch(s.id, { action: e.target.value })}
-            className="text-xs px-2 py-1 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
-          >
-            {ACTION_OPTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-          </select>
+          <div className="flex flex-col gap-1.5">
+            <select
+              value={s.action}
+              onChange={(e) => onPatch(s.id, { action: e.target.value })}
+              className="text-xs px-2 py-1 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            >
+              {ACTION_OPTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+            </select>
+            {s.action === "ATTEMPTED" && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onPatch(s.id, { callAttempts: Math.max(0, s.callAttempts - 1) })}
+                  className="w-6 h-6 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <span className="text-xs font-semibold text-gray-700 w-6 text-center tabular-nums">
+                  {s.callAttempts}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onPatch(s.id, { callAttempts: s.callAttempts + 1 })}
+                  className="w-6 h-6 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+                <span className="text-xs text-gray-400 ml-0.5">essai{s.callAttempts !== 1 ? "s" : ""}</span>
+              </div>
+            )}
+          </div>
         ) : (
-          <span className="text-xs text-gray-600">{actionLabel(s.action)}</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-gray-600">{actionLabel(s.action)}</span>
+            {s.action === "ATTEMPTED" && s.callAttempts > 0 && (
+              <span className="text-xs text-gray-400">{s.callAttempts} essai{s.callAttempts !== 1 ? "s" : ""}</span>
+            )}
+          </div>
+        )}
+      </td>
+
+      {/* Compte créé */}
+      <td className="px-3 py-3 text-center">
+        <CheckToggle checked={s.accountCreated} onChange={() => onToggle(s, "accountCreated")} disabled={!canEdit || saving === s.id + "accountCreated"} />
+      </td>
+
+      {/* WS ID — éditable */}
+      <td className="px-3 py-3 text-center">
+        {canEdit ? (
+          <input
+            value={wsId}
+            onChange={(e) => setWsId(e.target.value)}
+            onBlur={saveWsId}
+            placeholder="—"
+            className="w-28 text-xs px-2 py-1.5 border border-transparent hover:border-gray-200 focus:border-emerald-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-400 text-gray-700 bg-transparent hover:bg-white focus:bg-white transition-colors text-center font-mono"
+          />
+        ) : (
+          <span className="text-xs text-gray-500 font-mono">{s.workspaceId || "—"}</span>
         )}
       </td>
 
       {/* Checkboxes */}
-      <td className="px-3 py-3 text-center">
-        <CheckToggle checked={s.accountCreated} onChange={() => onToggle(s, "accountCreated")} disabled={!canEdit || saving === s.id + "accountCreated"} />
-      </td>
-      <td className="px-3 py-3 text-center">
-        <span className="text-xs text-gray-500">{s.workspaceId || "—"}</span>
-      </td>
       <td className="px-3 py-3 text-center">
         <CheckToggle checked={s.registeredWebinar} onChange={() => onToggle(s, "registeredWebinar")} disabled={!canEdit || saving === s.id + "registeredWebinar"} />
       </td>
@@ -460,7 +543,7 @@ function SupplierRow({
       </td>
 
       {/* Commentaires */}
-      <td className="px-3 py-3 max-w-[200px]">
+      <td className="px-3 py-3 max-w-[180px]">
         {isEditing ? (
           <div className="flex gap-1">
             <textarea
@@ -490,7 +573,7 @@ function SupplierRow({
         )}
       </td>
 
-      {/* Actions */}
+      {/* Supprimer */}
       {canEdit && (
         <td className="px-3 py-3">
           <button onClick={() => onDelete(s.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
