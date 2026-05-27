@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { formatDate } from "@/lib/utils";
 import {
   ChevronLeft, Calendar, User, Save, Pencil,
-  Building2, ChevronDown,
+  Building2, ChevronDown, Trash2, AlertTriangle,
 } from "lucide-react";
 import { SuppliersTab } from "./tabs/SuppliersTab";
 import { WaveMilestonesTab } from "./tabs/WaveMilestonesTab";
@@ -63,7 +64,10 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
   const [summarySaving, setSummarySaving] = useState(false);
   const [status, setStatus] = useState(wave.status);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
+  const router = useRouter();
   const canEdit = currentUserRole !== "MEMBER";
 
   const allTasks = milestones.flatMap((m) => m.tasks);
@@ -87,6 +91,17 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: v }),
     });
+  }
+
+  async function deleteWave() {
+    setDeleting(true);
+    const res = await fetch(`/api/waves/${wave.id}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/flywheel");
+    } else {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,12 +139,25 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
               </div>
             </div>
           </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-sm font-semibold text-gray-900">{progress}%</p>
-            <div className="w-32 bg-gray-100 rounded-full h-1.5 mt-1">
-              <div className={`h-1.5 rounded-full ${progress === 100 ? "bg-emerald-600" : "bg-emerald-400"}`} style={{ width: `${progress}%` }} />
+          <div className="flex items-start gap-3 flex-shrink-0">
+            {/* Bouton supprimer */}
+            {canEdit && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-200 hover:border-red-300 rounded-lg transition-colors mt-0.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Supprimer
+              </button>
+            )}
+            {/* Progress */}
+            <div className="text-right">
+              <p className="text-sm font-semibold text-gray-900">{progress}%</p>
+              <div className="w-32 bg-gray-100 rounded-full h-1.5 mt-1">
+                <div className={`h-1.5 rounded-full ${progress === 100 ? "bg-emerald-600" : "bg-emerald-400"}`} style={{ width: `${progress}%` }} />
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">{doneTasks}/{allTasks.length} tâches</p>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">{doneTasks}/{allTasks.length} tâches</p>
           </div>
         </div>
 
@@ -310,6 +338,43 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
           />
         )}
       </div>
+
+      {/* Modale de confirmation suppression */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Supprimer cette vague</h3>
+                <p className="text-sm text-gray-500 truncate max-w-xs">&ldquo;{wave.name}&rdquo;</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              Cette action est <strong>irréversible</strong>. Toutes les milestones, tâches, fournisseurs et commentaires associés seront définitivement supprimés.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors disabled:opacity-60"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={deleteWave}
+                disabled={deleting}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? "Suppression..." : "Supprimer définitivement"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Task panel slide-in */}
       {selectedTaskId && (

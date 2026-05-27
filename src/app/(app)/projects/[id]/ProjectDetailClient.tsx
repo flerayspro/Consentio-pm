@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { formatDate } from "@/lib/utils";
-import { ChevronLeft, ChevronDown, User, Calendar, Save, Pencil, LayoutTemplate, Tag, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronDown, User, Calendar, Save, Pencil, LayoutTemplate, Tag, Plus, X, Trash2, AlertTriangle } from "lucide-react";
 import { MilestonesTab } from "./tabs/MilestonesTab";
 import { ResourcesTab } from "./tabs/ResourcesTab";
 import { TaskPanel } from "./TaskPanel";
@@ -60,6 +61,10 @@ export function ProjectDetailClient({
   const [projectTags, setProjectTags] = useState<TagItem[]>(project.tags);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [tagSaving, setTagSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const router = useRouter();
 
   const allTasks = milestones.flatMap((m) => m.tasks);
   const doneTasks = allTasks.filter((t) => t.status === "DONE").length;
@@ -106,6 +111,17 @@ export function ProjectDetailClient({
     });
   }
 
+  async function deleteProject() {
+    setDeleting(true);
+    const res = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/projects");
+    } else {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }
+
   async function toggleTag(tag: TagItem) {
     const has = projectTags.some((t) => t.id === tag.id);
     const next = has ? projectTags.filter((t) => t.id !== tag.id) : [...projectTags, tag];
@@ -143,13 +159,25 @@ export function ProjectDetailClient({
               </div>
             </div>
           </div>
-          {/* Progress */}
-          <div className="text-right">
-            <p className="text-sm font-semibold text-gray-900">{progress}%</p>
-            <div className="w-32 bg-gray-100 rounded-full h-1.5 mt-1">
-              <div className={`h-1.5 rounded-full ${progress === 100 ? "bg-green-500" : "bg-blue-500"}`} style={{ width: `${progress}%` }} />
+          <div className="flex items-start gap-3 flex-shrink-0">
+            {/* Bouton supprimer */}
+            {currentUserRole !== "MEMBER" && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-200 hover:border-red-300 rounded-lg transition-colors mt-0.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Supprimer
+              </button>
+            )}
+            {/* Progress */}
+            <div className="text-right">
+              <p className="text-sm font-semibold text-gray-900">{progress}%</p>
+              <div className="w-32 bg-gray-100 rounded-full h-1.5 mt-1">
+                <div className={`h-1.5 rounded-full ${progress === 100 ? "bg-green-500" : "bg-blue-500"}`} style={{ width: `${progress}%` }} />
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">{doneTasks}/{allTasks.length} tâches</p>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">{doneTasks}/{allTasks.length} tâches</p>
           </div>
         </div>
 
@@ -428,6 +456,43 @@ export function ProjectDetailClient({
           <ResourcesTab projectId={project.id} />
         )}
       </div>
+
+      {/* Modale de confirmation suppression */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Supprimer ce projet</h3>
+                <p className="text-sm text-gray-500 truncate max-w-xs">&ldquo;{project.name}&rdquo;</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              Cette action est <strong>irréversible</strong>. Toutes les milestones, tâches, commentaires et fichiers associés seront définitivement supprimés.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors disabled:opacity-60"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={deleteProject}
+                disabled={deleting}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? "Suppression..." : "Supprimer définitivement"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Task panel */}
       {selectedTaskId && (
