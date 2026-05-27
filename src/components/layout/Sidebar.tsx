@@ -127,14 +127,12 @@ export function Sidebar({ user, projects, templates, waves }: SidebarProps) {
     { href: "/mes-taches", label: "Mes tâches",        icon: CheckSquare },
     { href: "/projects",   label: "Tous les projets",  icon: FolderKanban },
     ...(user.role !== "MEMBER" ? [{ href: "/templates", label: "Templates", icon: FileStack }] : []),
-    ...(user.role === "ADMIN"  ? [{ href: "/admin",     label: "Administration", icon: ShieldCheck }] : []),
   ];
 
   const flywheelNavItems = [
     { href: "/flywheel/dashboard", label: "Dashboard",           icon: LayoutDashboard },
     { href: "/flywheel",           label: "Vagues d'activation", icon: Zap },
-    ...(user.role !== "MEMBER" ? [{ href: "/flywheel/templates", label: "Templates",    icon: FileStack }] : []),
-    ...(user.role === "ADMIN"  ? [{ href: "/admin",              label: "Administration", icon: ShieldCheck }] : []),
+    ...(user.role !== "MEMBER" ? [{ href: "/flywheel/templates", label: "Templates", icon: FileStack }] : []),
   ];
 
   const navItems = isFlywheel ? flywheelNavItems : implNavItems;
@@ -268,6 +266,27 @@ export function Sidebar({ user, projects, templates, waves }: SidebarProps) {
           </div>
         )}
       </nav>
+
+      {/* ── Global section (instance-agnostic) ──────────────────────────── */}
+      {user.role === "ADMIN" && (
+        <div className="px-3 pb-2 border-t border-gray-100 pt-2 flex-shrink-0">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-3 py-1.5">
+            Global
+          </p>
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+              pathname === "/admin" || pathname.startsWith("/admin/")
+                ? "bg-gray-100 text-gray-900"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            )}
+          >
+            <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 truncate">Administration</span>
+          </Link>
+        </div>
+      )}
 
       {/* User + logout */}
       <div className="p-3 border-t border-gray-100 flex-shrink-0">
