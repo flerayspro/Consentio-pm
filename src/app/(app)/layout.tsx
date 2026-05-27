@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const where = session.user.role === "PROJECT_MANAGER" ? { managerId: session.user.id } : {};
 
-  const [projects, templates, waves] = await Promise.all([
+  const [projects, templates, waves, waveTemplates] = await Promise.all([
     prisma.project.findMany({
       where: { ...where, status: "ACTIVE" },
       select: { id: true, name: true, health: true },
@@ -30,11 +30,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       orderBy: { updatedAt: "desc" },
       take: 10,
     }),
+    session.user.role !== "MEMBER"
+      ? prisma.waveTemplate.findMany({
+          select: { id: true, name: true, isDefault: true },
+          orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+          take: 20,
+        })
+      : Promise.resolve([]),
   ]);
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar user={session.user} projects={projects} templates={templates} waves={waves} />
+      <Sidebar user={session.user} projects={projects} templates={templates} waves={waves} waveTemplates={waveTemplates} />
       <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
   );

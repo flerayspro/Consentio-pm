@@ -45,6 +45,7 @@ interface SidebarProps {
   projects: { id: string; name: string; health: string }[];
   templates: { id: string; name: string }[];
   waves: { id: string; name: string; status: string }[];
+  waveTemplates: { id: string; name: string; isDefault: boolean }[];
 }
 
 // ── Workspace switcher ────────────────────────────────────────────────────────
@@ -113,11 +114,12 @@ function WorkspaceSwitcher() {
 }
 
 // ── Main sidebar ──────────────────────────────────────────────────────────────
-export function Sidebar({ user, projects, templates, waves }: SidebarProps) {
+export function Sidebar({ user, projects, templates, waves, waveTemplates }: SidebarProps) {
   const pathname = usePathname();
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [wavesOpen, setWavesOpen] = useState(true);
+  const [waveTemplatesOpen, setWaveTemplatesOpen] = useState(false);
 
   const isFlywheel = pathname.startsWith("/flywheel");
 
@@ -261,6 +263,33 @@ export function Sidebar({ user, projects, templates, waves }: SidebarProps) {
                     </Link>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Flywheel: templates ───────────────────────────────────────── */}
+        {isFlywheel && waveTemplates.length > 0 && (
+          <div className="pt-2">
+            <button
+              onClick={() => setWaveTemplatesOpen((o) => !o)}
+              className="flex items-center gap-2 px-3 py-1.5 w-full text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors"
+            >
+              {waveTemplatesOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              Templates
+            </button>
+            {waveTemplatesOpen && (
+              <div className="mt-0.5 space-y-0.5">
+                {waveTemplates.map((t) => (
+                  <Link
+                    key={t.id}
+                    href="/flywheel/templates"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                  >
+                    <FileStack className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
+                    <span className="truncate flex-1">{t.name}</span>
+                  </Link>
+                ))}
               </div>
             )}
           </div>
