@@ -3,12 +3,95 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn, getRoleLabel } from "@/lib/utils";
 import {
   LayoutDashboard, FolderKanban, FileStack, LogOut,
-  ChevronRight, ChevronDown, Circle, CheckSquare, Settings, ShieldCheck,
+  ChevronRight, ChevronDown, Circle, CheckSquare, Settings, ShieldCheck, Check,
 } from "lucide-react";
+
+const WORKSPACES = [
+  {
+    id: "implementation",
+    name: "Consentio Implementation",
+    subtitle: "Gestion de projet",
+    href: "/dashboard",
+    color: "bg-blue-600",
+    letter: "I",
+  },
+  {
+    id: "flywheel",
+    name: "Consentio Flywheel",
+    subtitle: "Activation fournisseurs",
+    href: "/flywheel",
+    color: "bg-emerald-600",
+    letter: "F",
+  },
+];
+
+function WorkspaceSwitcher() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const isFlywheel = pathname.startsWith("/flywheel");
+  const current = isFlywheel ? WORKSPACES[1] : WORKSPACES[0];
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-3 w-full hover:bg-gray-50 rounded-xl p-1 -m-1 transition-colors group"
+      >
+        <div className={`w-8 h-8 ${current.color} rounded-xl flex items-center justify-center flex-shrink-0`}>
+          <span className="text-white font-bold text-sm">{current.letter}</span>
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <p className="font-semibold text-gray-900 text-sm leading-tight truncate">{current.name}</p>
+          <p className="text-xs text-gray-400 leading-tight">{current.subtitle}</p>
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-1.5">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-2.5 py-1.5">Instances</p>
+          {WORKSPACES.map((ws) => {
+            const isActive = ws.id === current.id;
+            return (
+              <Link
+                key={ws.id}
+                href={ws.href}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-2.5 py-2.5 rounded-lg transition-colors",
+                  isActive ? "bg-gray-50" : "hover:bg-gray-50"
+                )}
+              >
+                <div className={`w-7 h-7 ${ws.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                  <span className="text-white font-bold text-xs">{ws.letter}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 leading-tight">{ws.name}</p>
+                  <p className="text-xs text-gray-400 leading-tight">{ws.subtitle}</p>
+                </div>
+                {isActive && <Check className="w-4 h-4 text-blue-500 flex-shrink-0" />}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const HEALTH_COLORS: Record<string, string> = {
   ON_TRACK: "text-green-400",
@@ -44,17 +127,9 @@ export function Sidebar({ user, projects, templates }: SidebarProps) {
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-      {/* Logo */}
+      {/* Workspace switcher */}
       <div className="p-4 border-b border-gray-100 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-sm">C</span>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900 text-sm">Consentio PM</p>
-            <p className="text-xs text-gray-400">Gestion de projet</p>
-          </div>
-        </div>
+        <WorkspaceSwitcher />
       </div>
 
       {/* Nav + sections scrollables */}
