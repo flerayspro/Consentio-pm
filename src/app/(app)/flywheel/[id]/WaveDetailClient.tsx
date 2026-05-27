@@ -139,25 +139,13 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
               </div>
             </div>
           </div>
-          <div className="flex items-start gap-3 flex-shrink-0">
-            {/* Bouton supprimer */}
-            {canEdit && (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-200 hover:border-red-300 rounded-lg transition-colors mt-0.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Supprimer
-              </button>
-            )}
-            {/* Progress */}
-            <div className="text-right">
-              <p className="text-sm font-semibold text-gray-900">{progress}%</p>
-              <div className="w-32 bg-gray-100 rounded-full h-1.5 mt-1">
-                <div className={`h-1.5 rounded-full ${progress === 100 ? "bg-emerald-600" : "bg-emerald-400"}`} style={{ width: `${progress}%` }} />
-              </div>
-              <p className="text-xs text-gray-400 mt-0.5">{doneTasks}/{allTasks.length} tâches</p>
+          {/* Progress */}
+          <div className="text-right flex-shrink-0">
+            <p className="text-sm font-semibold text-gray-900">{progress}%</p>
+            <div className="w-32 bg-gray-100 rounded-full h-1.5 mt-1">
+              <div className={`h-1.5 rounded-full ${progress === 100 ? "bg-emerald-600" : "bg-emerald-400"}`} style={{ width: `${progress}%` }} />
             </div>
+            <p className="text-xs text-gray-400 mt-0.5">{doneTasks}/{allTasks.length} tâches</p>
           </div>
         </div>
 
@@ -303,6 +291,17 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
                     </div>
                   ))}
                 </div>
+              )}
+
+              {/* Supprimer la vague */}
+              {canEdit && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-200 hover:border-red-300 rounded-xl transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Supprimer cette vague
+                </button>
               )}
             </div>
           </div>
