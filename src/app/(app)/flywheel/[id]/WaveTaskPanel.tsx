@@ -1,0 +1,224 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { formatDate } from "@/lib/utils";
+import { X, Calendar, User, Send, Trash2, CheckCircle2, Clock, Circle } from "lucide-react";
+
+interface Comment { id: string; content: string; createdAt: string; author: { id: string; name: string }; }
+interface WaveTaskDetail {
+  id: string; name: string; description?: string | null; status: string;
+  dueDate: string; startDate?: string | null;
+  assignee?: { id: string; name: string } | null;
+  comments: Comment[];
+}
+interface UserItem { id: string; name: string; role: string; }
+
+const STATUS_OPTIONS = [
+  { value: "TODO",        label: "À faire",  icon: <Circle className="w-3.5 h-3.5 text-gray-400" /> },
+  { value: "IN_PROGRESS", label: "En cours", icon: <Clock className="w-3.5 h-3.5 text-yellow-500" /> },
+  { value: "DONE",        label: "Terminé",  icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> },
+];
+
+interface Props {
+  taskId: string;
+  users: UserItem[];
+  currentUserId: string;
+  currentUserRole: string;
+  onClose: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onUpdate: (task: Record<string, any>) => void;
+}
+
+export function WaveTaskPanel({ taskId, users, currentUserId, currentUserRole, onClose, onUpdate }: Props) {
+  const [task, setTask] = useState<WaveTaskDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [comment, setComment] = useState("");
+  const [sendingComment, setSendingComment] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [editName, setEditName]           = useState("");
+  const [editDesc, setEditDesc]           = useState("");
+  const [editDueDate, setEditDueDate]     = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editAssigneeId, setEditAssigneeId] = useState("");
+  const [editStatus, setEditStatus]       = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/wave-tasks/${taskId}`)
+      .then((r) => r.json())
+      .then((data: WaveTaskDetail) => {
+        setTask(data);
+        setEditName(data.name);
+        setEditDesc(data.description ?? "");
+        setEditDueDate(data.dueDate ? data.dueDate.slice(0, 10) : "");
+        setEditStartDate(data.startDate ? data.startDate.slice(0, 10) : "");
+        setEditAssigneeId(data.assignee?.id ?? "");
+        setEditStatus(data.status);
+        setLoading(false);
+      });
+  }, [taskId]);
+
+  async function saveField(field: string, value: string | null) {
+    setSaving(true);
+    const res = await fetch(`/api/wave-tasks/${taskId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: value || undefined }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setTask((prev) => prev ? { ...prev, ...updated } : prev);
+      onUpdate(updated);
+    }
+    setSaving(false);
+  }
+
+  async function sendComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!comment.trim()) return;
+    setSendingComment(true);
+    const res = await fetch(`/api/wave-tasks/${taskId}/comments`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: comment.trim() }),
+    });
+    if (res.ok) {
+      const c = await res.json();
+      setTask((prev) => prev ? { ...prev, comments: [...prev.comments, c] } : prev);
+      setComment("");
+    }
+    setSendingComment(false);
+  }
+
+  async function deleteComment(id: string) {
+    const res = await fetch(`/api/wave-comments/${id}`, { method: "DELETE" });
+    if (res.ok) setTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== id) } : prev);
+  }
+
+  void saving;
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/20 z-30" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-[480px] bg-white border-l border-gray-200 z-40 flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="font-semibold text-gray-900 text-sm">Détail de la tâche</h2>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {loading || !task ? (
+          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Chargement...</div>
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            {/* Nom */}
+            <div className="px-5 pt-4 pb-2">
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onBlur={() => editName !== task.name && saveField("name", editName)}
+                className="w-full text-lg font-bold text-gray-900 border-0 border-b border-transparent hover:border-gray-200 focus:border-emerald-400 focus:outline-none pb-1 transition-colors"
+              />
+            </div>
+
+            {/* Champs */}
+            <div className="px-5 py-3 grid grid-cols-2 gap-3 border-b border-gray-100">
+              {/* Statut */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Statut</label>
+                <select value={editStatus}
+                  onChange={(e) => { setEditStatus(e.target.value); saveField("status", e.target.value); }}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+
+              {/* Échéance */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />Échéance</label>
+                <input type="date" value={editDueDate}
+                  onChange={(e) => setEditDueDate(e.target.value)}
+                  onBlur={() => editDueDate && saveField("dueDate", editDueDate)}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Début */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />Début</label>
+                <input type="date" value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                  onBlur={() => saveField("startDate", editStartDate || null)}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Assigné */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1"><User className="w-3 h-3" />Responsable</label>
+                <select value={editAssigneeId}
+                  onChange={(e) => { setEditAssigneeId(e.target.value); saveField("assigneeId", e.target.value || null); }}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  <option value="">Non assigné</option>
+                  {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="px-5 py-3 border-b border-gray-100">
+              <label className="block text-xs text-gray-400 mb-1">Description</label>
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                onBlur={() => editDesc !== (task.description ?? "") && saveField("description", editDesc)}
+                rows={3}
+                placeholder="Ajoutez une description..."
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+              />
+            </div>
+
+            {/* Commentaires */}
+            <div className="px-5 py-3">
+              <label className="text-xs font-medium text-gray-500 block mb-3">Commentaires ({task.comments.length})</label>
+              <div className="space-y-3 mb-3">
+                {task.comments.length === 0 && (
+                  <p className="text-xs text-gray-300">Aucun commentaire</p>
+                )}
+                {task.comments.map((c) => (
+                  <div key={c.id} className="group">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-emerald-700 text-xs font-medium">{c.author.name.charAt(0)}</span>
+                      </div>
+                      <span className="text-xs font-medium text-gray-700">{c.author.name}</span>
+                      <span className="text-xs text-gray-400">{formatDate(c.createdAt)}</span>
+                      {(c.author.id === currentUserId || currentUserRole === "ADMIN") && (
+                        <button onClick={() => deleteComment(c.id)} className="ml-auto opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="ml-7 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">{c.content}</div>
+                  </div>
+                ))}
+              </div>
+              <form onSubmit={sendComment} className="flex gap-2">
+                <input
+                  value={comment} onChange={(e) => setComment(e.target.value)}
+                  placeholder="Ajouter un commentaire..."
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <button type="submit" disabled={sendingComment || !comment.trim()}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-lg transition-colors">
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

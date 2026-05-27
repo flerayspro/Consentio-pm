@@ -16,7 +16,12 @@ export default async function WaveDetailPage({ params }: { params: Promise<{ id:
       include: {
         manager: { select: { id: true, name: true, email: true } },
         milestones: {
-          include: { tasks: { orderBy: { order: "asc" } } },
+          include: {
+            tasks: {
+              include: { assignee: { select: { id: true, name: true } } },
+              orderBy: { order: "asc" },
+            },
+          },
           orderBy: { order: "asc" },
         },
         suppliers: { orderBy: { supplierName: "asc" } },

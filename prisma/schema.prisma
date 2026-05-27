@@ -97,6 +97,8 @@ model User {
   uploadedFiles        TaskFile[]       @relation("FileUploader")
   managedWaves         Wave[]           @relation("WaveManager")
   createdWaveTemplates WaveTemplate[]   @relation("CreatedWaveTemplates")
+  assignedWaveTasks    WaveTask[]       @relation("WaveTaskAssignee")
+  waveTaskComments     WaveTaskComment[] @relation("WaveTaskCommentAuthor")
 }
 
 model ProjectTemplate {
@@ -245,14 +247,29 @@ model WaveTask {
   milestoneId String
   milestone   WaveMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
   name        String
-  owner       String        @default("Consentio")
+  description String?
+  owner       String        @default("")
+  assigneeId  String?
+  assignee    User?         @relation("WaveTaskAssignee", fields: [assigneeId], references: [id])
   order       Int           @default(0)
   startDate   DateTime?
   dueDate     DateTime
   status      String        @default("TODO")
   pctComplete Float         @default(0)
+  comments    WaveTaskComment[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+}
+
+model WaveTaskComment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  task     WaveTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId   String
+  author   User     @relation("WaveTaskCommentAuthor", fields: [authorId], references: [id])
+  authorId String
 }
 
 model WaveSupplier {

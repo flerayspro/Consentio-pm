@@ -5,10 +5,12 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { formatDate } from "@/lib/utils";
 import {
-  ChevronLeft, Calendar, User, Save, Pencil, CheckCircle2, Circle, Clock,
+  ChevronLeft, Calendar, User, Save, Pencil,
   Building2, ChevronDown,
 } from "lucide-react";
 import { SuppliersTab } from "./tabs/SuppliersTab";
+import { WaveMilestonesTab } from "./tabs/WaveMilestonesTab";
+import { WaveTaskPanel } from "./WaveTaskPanel";
 
 const RichTextEditor = dynamic(
   () => import("@/components/editor/RichTextEditor").then((m) => m.RichTextEditor),
@@ -24,20 +26,12 @@ const STATUS_OPTIONS = [
   { value: "CANCELLED", label: "Annulée",   color: "bg-gray-100 text-gray-600 border-gray-200" },
 ];
 
-const TASK_STATUS_ICON: Record<string, React.ReactNode> = {
-  DONE:        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />,
-  IN_PROGRESS: <Clock className="w-4 h-4 text-yellow-500 flex-shrink-0" />,
-  TODO:        <Circle className="w-4 h-4 text-gray-300 flex-shrink-0" />,
-};
-
-const OWNER_COLORS: Record<string, string> = {
-  Consentio:    "bg-blue-100 text-blue-700",
-  Client:       "bg-purple-100 text-purple-700",
-  Fournisseurs: "bg-orange-100 text-orange-700",
-};
-
-interface WaveTask { id: string; name: string; owner: string; status: string; startDate: Date | null; dueDate: Date; pctComplete: number; order: number; }
-interface WaveMilestone { id: string; name: string; owner: string; status: string; startDate: Date | null; dueDate: Date; order: number; tasks: WaveTask[]; }
+interface WaveTask {
+  id: string; name: string; description?: string | null; status: string;
+  startDate?: Date | null; dueDate: Date; order: number;
+  assignee?: { id: string; name: string } | null;
+}
+interface WaveMilestone { id: string; name: string; status: string; startDate?: Date | null; dueDate: Date; order: number; tasks: WaveTask[]; }
 interface WaveSupplier {
   id: string; waveId: string; supplierName: string; supplierCode: string | null;
   email: string | null; firstName: string | null; lastName: string | null;
@@ -58,15 +52,16 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
   wave: Wave; users: User[]; currentUserRole: string; currentUserId: string;
 }) {
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Résumé");
+  const [milestones, setMilestones] = useState<WaveMilestone[]>(wave.milestones);
   const [summary, setSummary] = useState(wave.summary ?? "");
   const [editingSummary, setEditingSummary] = useState(false);
   const [summarySaving, setSummarySaving] = useState(false);
   const [status, setStatus] = useState(wave.status);
-  const [openMilestones, setOpenMilestones] = useState<Set<string>>(new Set());
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const canEdit = currentUserRole !== "MEMBER";
 
-  const allTasks = wave.milestones.flatMap((m) => m.tasks);
+  const allTasks = milestones.flatMap((m) => m.tasks);
   const doneTasks = allTasks.filter((t) => t.status === "DONE").length;
   const progress = allTasks.length > 0 ? Math.round((doneTasks / allTasks.length) * 100) : 0;
   const statusOpt = STATUS_OPTIONS.find((s) => s.value === status) ?? STATUS_OPTIONS[0];
@@ -89,26 +84,16 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
     });
   }
 
-  async function toggleTaskStatus(task: WaveTask, milestone: WaveMilestone) {
-    if (!canEdit) return;
-    const next = task.status === "TODO" ? "IN_PROGRESS" : task.status === "IN_PROGRESS" ? "DONE" : "TODO";
-    // Optimistic update via re-fetch or local mutation — use server state for now
-    await fetch(`/api/waves/${wave.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
-    // For simplicity, reload page to reflect changes
-    window.location.reload();
-    void (task); void (milestone); void (next);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function handleTaskUpdate(taskId: string, updated: Record<string, any>) {
+    setMilestones((prev) => prev.map((m) => ({
+      ...m,
+      tasks: m.tasks.map((t) => t.id === taskId ? { ...t, ...updated } : t),
+    })));
   }
 
-  function toggleMilestone(id: string) {
-    setOpenMilestones((prev) => {
-      const s = new Set(prev);
-      s.has(id) ? s.delete(id) : s.add(id);
-      return s;
-    });
-  }
-
-  // ── Gantt data ─────────────────────────────────────────────────────────────
-  const ganttMilestones = wave.milestones.map((m) => {
+  // ── Gantt data ──────────────────────────────────────────────────────────────
+  const ganttMilestones = milestones.map((m) => {
     const taskDates = m.tasks.map((t) => new Date(t.dueDate).getTime());
     const mEnd = new Date(m.dueDate);
     const mStart = m.startDate ? new Date(m.startDate) : taskDates.length > 0 ? new Date(Math.min(...taskDates)) : mEnd;
@@ -141,10 +126,10 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
               </div>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex-shrink-0">
             <p className="text-sm font-semibold text-gray-900">{progress}%</p>
             <div className="w-32 bg-gray-100 rounded-full h-1.5 mt-1">
-              <div className={`h-1.5 rounded-full ${progress === 100 ? "bg-green-500" : "bg-emerald-500"}`} style={{ width: `${progress}%` }} />
+              <div className={`h-1.5 rounded-full ${progress === 100 ? "bg-emerald-600" : "bg-emerald-400"}`} style={{ width: `${progress}%` }} />
             </div>
             <p className="text-xs text-gray-400 mt-0.5">{doneTasks}/{allTasks.length} tâches</p>
           </div>
@@ -168,7 +153,7 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
         {/* ── Résumé ── */}
         {activeTab === "Résumé" && (
           <div className="flex gap-6 p-6">
-            {/* Left: summary */}
+            {/* Gauche : résumé riche */}
             <div className="flex-1 min-w-0">
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
@@ -209,7 +194,7 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
               </div>
             </div>
 
-            {/* Right sidebar */}
+            {/* Droite : sidebar infos */}
             <div className="w-64 flex-shrink-0 space-y-4">
               {/* Statut */}
               <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -267,7 +252,7 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
                   <span className="text-xs text-gray-400 mb-1">{doneTasks} / {allTasks.length} tâches</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div className={`h-2 rounded-full ${progress === 100 ? "bg-green-500" : "bg-emerald-500"}`} style={{ width: `${progress}%` }} />
+                  <div className={`h-2 rounded-full ${progress === 100 ? "bg-emerald-600" : "bg-emerald-400"}`} style={{ width: `${progress}%` }} />
                 </div>
               </div>
 
@@ -276,18 +261,18 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
                 <div className="bg-white rounded-xl border border-gray-200 p-4">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Fournisseurs</p>
                   {[
-                    { label: "Total",       value: wave.suppliers.length, total: wave.suppliers.length },
-                    { label: "Compte créé", value: wave.suppliers.filter((s) => s.accountCreated).length, total: wave.suppliers.length },
-                    { label: "Formés",      value: wave.suppliers.filter((s) => s.assistedWebinar).length, total: wave.suppliers.length },
-                    { label: "Configurés",  value: wave.suppliers.filter((s) => s.configured).length, total: wave.suppliers.length },
-                  ].map(({ label, value, total }) => (
+                    { label: "Total",       value: wave.suppliers.length },
+                    { label: "Compte créé", value: wave.suppliers.filter((s) => s.accountCreated).length },
+                    { label: "Formés",      value: wave.suppliers.filter((s) => s.assistedWebinar).length },
+                    { label: "Configurés",  value: wave.suppliers.filter((s) => s.configured).length },
+                  ].map(({ label, value }) => (
                     <div key={label} className="mb-2">
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="text-xs text-gray-500">{label}</span>
-                        <span className="text-xs font-semibold text-gray-700">{value}/{total}</span>
+                        <span className="text-xs font-semibold text-gray-700">{value}/{wave.suppliers.length}</span>
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-1">
-                        <div className="h-1 rounded-full bg-emerald-400" style={{ width: `${total > 0 ? Math.round((value / total) * 100) : 0}%` }} />
+                        <div className="h-1 rounded-full bg-emerald-400" style={{ width: `${wave.suppliers.length > 0 ? Math.round((value / wave.suppliers.length) * 100) : 0}%` }} />
                       </div>
                     </div>
                   ))}
@@ -299,68 +284,21 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
 
         {/* ── Milestones ── */}
         {activeTab === "Milestones" && (
-          <div className="p-6 space-y-3">
-            {wave.milestones.length === 0 && (
-              <div className="text-center py-16 text-gray-400">Aucun milestone — utilisez le template lors de la création.</div>
-            )}
-            {wave.milestones.map((m) => {
-              const isOpen = openMilestones.has(m.id);
-              const done = m.tasks.filter((t) => t.status === "DONE").length;
-              const pct = m.tasks.length > 0 ? Math.round((done / m.tasks.length) * 100) : 0;
-              return (
-                <div key={m.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <button
-                    onClick={() => toggleMilestone(m.id)}
-                    className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition-colors text-left"
-                  >
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "" : "-rotate-90"}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900 text-sm">{m.name}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${OWNER_COLORS[m.owner] ?? "bg-gray-100 text-gray-600"}`}>{m.owner}</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {m.startDate ? `${formatDate(m.startDate)} → ` : ""}{formatDate(m.dueDate)} · {m.tasks.length} tâche{m.tasks.length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-semibold text-gray-700">{pct}%</p>
-                      <div className="w-20 bg-gray-100 rounded-full h-1.5 mt-1">
-                        <div className={`h-1.5 rounded-full ${pct === 100 ? "bg-green-500" : "bg-emerald-500"}`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  </button>
-
-                  {isOpen && (
-                    <div className="border-t border-gray-100 divide-y divide-gray-50">
-                      {m.tasks.map((t) => (
-                        <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50">
-                          <button onClick={() => canEdit && toggleTaskStatus(t, m)} disabled={!canEdit}
-                            className="disabled:cursor-default">
-                            {TASK_STATUS_ICON[t.status] ?? TASK_STATUS_ICON.TODO}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm ${t.status === "DONE" ? "line-through text-gray-400" : "text-gray-900"}`}>{t.name}</p>
-                            <p className="text-xs text-gray-400">{formatDate(t.dueDate)}</p>
-                          </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${OWNER_COLORS[t.owner] ?? "bg-gray-100 text-gray-600"}`}>
-                            {t.owner}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <WaveMilestonesTab
+            waveId={wave.id}
+            milestones={milestones}
+            setMilestones={setMilestones}
+            users={users}
+            currentUserRole={currentUserRole}
+            onTaskClick={(taskId) => setSelectedTaskId(taskId)}
+          />
         )}
 
         {/* ── Gantt ── */}
         {activeTab === "Gantt" && (
           <div className="p-6">
             {ganttMilestones.length === 0 ? (
-              <div className="text-center py-16 text-gray-400">Aucun milestone à afficher dans le Gantt.</div>
+              <div className="text-center py-16 text-gray-400">Aucune phase à afficher dans le Gantt.</div>
             ) : (
               <WaveGantt milestones={ganttMilestones} waveName={wave.name} startDate={wave.startDate} endDate={wave.endDate} />
             )}
@@ -376,13 +314,25 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
           />
         )}
       </div>
+
+      {/* Task panel slide-in */}
+      {selectedTaskId && (
+        <WaveTaskPanel
+          taskId={selectedTaskId}
+          users={users}
+          currentUserId={currentUserId}
+          currentUserRole={currentUserRole}
+          onClose={() => setSelectedTaskId(null)}
+          onUpdate={(updated) => handleTaskUpdate(selectedTaskId, updated)}
+        />
+      )}
     </div>
   );
 }
 
-// ── Gantt minimaliste ─────────────────────────────────────────────────────────
+// ── Gantt minimaliste ──────────────────────────────────────────────────────────
 function WaveGantt({ milestones, waveName, startDate, endDate }: {
-  milestones: { id: string; name: string; start: Date; end: Date; tasks: { id: string; name: string; owner: string; startDate: Date | null; dueDate: Date; status: string }[] }[];
+  milestones: { id: string; name: string; start: Date; end: Date; tasks: { id: string; name: string; startDate?: Date | null; dueDate: Date; status: string }[] }[];
   waveName: string; startDate: Date; endDate: Date;
 }) {
   const waveStart = new Date(startDate);
