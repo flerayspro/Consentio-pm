@@ -16,6 +16,7 @@ const patchSchema = z.object({
   workspaceId: z.string().nullable().optional(),
   action: z.string().optional(),
   callAttempts: z.number().int().min(0).optional(),
+  ownerId: z.string().nullable().optional(),
   comments: z.string().nullable().optional(),
   accountCreated: z.boolean().optional(),
   registeredWebinar: z.boolean().optional(),
@@ -36,6 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const supplier = await prisma.waveSupplier.update({
     where: { id: sid },
     data: parsed.data,
+    include: { owner: { select: { id: true, name: true } } },
   });
   return NextResponse.json(supplier);
 }

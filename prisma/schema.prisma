@@ -99,6 +99,7 @@ model User {
   createdWaveTemplates WaveTemplate[]   @relation("CreatedWaveTemplates")
   assignedWaveTasks    WaveTask[]       @relation("WaveTaskAssignee")
   waveTaskComments     WaveTaskComment[] @relation("WaveTaskCommentAuthor")
+  ownedWaveSuppliers   WaveSupplier[]   @relation("WaveSupplierOwner")
 }
 
 model ProjectTemplate {
@@ -287,6 +288,8 @@ model WaveSupplier {
   workspaceId       String?
   action            String   @default("TO_CONTACT")    // TO_CONTACT | NO_NEED | CONNECTED | ATTEMPTED
   callAttempts      Int      @default(0)
+  ownerId           String?
+  owner             User?    @relation("WaveSupplierOwner", fields: [ownerId], references: [id])
   comments          String?
   accountCreated    Boolean  @default(false)
   registeredWebinar Boolean  @default(false)

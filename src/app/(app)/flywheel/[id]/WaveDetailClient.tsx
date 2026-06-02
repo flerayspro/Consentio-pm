@@ -44,6 +44,7 @@ interface WaveSupplier {
   phone: string | null; language: string | null; status: string; workspaceId: string | null;
   action: string; callAttempts: number; comments: string | null; accountCreated: boolean;
   registeredWebinar: boolean; assistedWebinar: boolean; configured: boolean; productFamilies: string[];
+  ownerId: string | null; owner: { id: string; name: string } | null;
 }
 interface Wave {
   id: string; name: string; clientName: string; status: string;
@@ -333,6 +334,7 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
           <SuppliersTab
             waveId={wave.id}
             initialSuppliers={wave.suppliers}
+            users={users}
             canEdit={canEdit}
           />
         )}

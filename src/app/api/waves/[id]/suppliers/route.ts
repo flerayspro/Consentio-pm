@@ -16,6 +16,7 @@ const createSchema = z.object({
   workspaceId: z.string().optional(),
   action: z.string().optional(),
   callAttempts: z.number().int().min(0).optional(),
+  ownerId: z.string().nullable().optional(),
   comments: z.string().optional(),
   productFamilies: z.array(z.string()).optional(),
 });
@@ -31,6 +32,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const suppliers = await prisma.waveSupplier.findMany({
     where: { waveId: id },
     orderBy: { supplierName: "asc" },
+    include: { owner: { select: { id: true, name: true } } },
   });
   return NextResponse.json(suppliers);
 }
@@ -51,7 +53,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       data: parsed.data.map((s) => ({ waveId: id, ...s, productFamilies: s.productFamilies ?? [] })),
       skipDuplicates: false,
     });
-    const all = await prisma.waveSupplier.findMany({ where: { waveId: id }, orderBy: { supplierName: "asc" } });
+    const all = await prisma.waveSupplier.findMany({
+      where: { waveId: id },
+      orderBy: { supplierName: "asc" },
+      include: { owner: { select: { id: true, name: true } } },
+    });
     return NextResponse.json(all, { status: 201 });
   }
 
@@ -61,6 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const supplier = await prisma.waveSupplier.create({
     data: { waveId: id, ...parsed.data, productFamilies: parsed.data.productFamilies ?? [] },
+    include: { owner: { select: { id: true, name: true } } },
   });
   return NextResponse.json(supplier, { status: 201 });
 }

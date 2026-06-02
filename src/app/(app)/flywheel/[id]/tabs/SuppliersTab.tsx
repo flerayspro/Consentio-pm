@@ -17,7 +17,10 @@ interface Supplier {
   comments: string | null;
   accountCreated: boolean; registeredWebinar: boolean; assistedWebinar: boolean; configured: boolean;
   productFamilies: string[];
+  ownerId: string | null; owner: { id: string; name: string } | null;
 }
+
+interface UserItem { id: string; name: string; email: string; role: string; }
 
 type SortDir = "asc" | "desc";
 
@@ -225,13 +228,14 @@ function nullify(form: SupplierForm) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
-  waveId: string; initialSuppliers: Supplier[]; canEdit: boolean;
+export function SuppliersTab({ waveId, initialSuppliers, users, canEdit }: {
+  waveId: string; initialSuppliers: Supplier[]; users: UserItem[]; canEdit: boolean;
 }) {
   const [suppliers, setSuppliers] = useState(initialSuppliers);
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterAction, setFilterAction] = useState("ALL");
+  const [filterOwner, setFilterOwner]   = useState("ALL");
   const [sortCol, setSortCol]           = useState<string | null>(null);
   const [sortDir, setSortDir]           = useState<SortDir>("asc");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -265,12 +269,16 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
         (s.supplierCode ?? "").toLowerCase().includes(q);
       const matchStatus = filterStatus === "ALL" || s.status === filterStatus;
       const matchAction = filterAction === "ALL" || s.action === filterAction;
-      return matchSearch && matchStatus && matchAction;
+      const matchOwner =
+        filterOwner === "ALL" ||
+        (filterOwner === "UNASSIGNED" ? !s.ownerId : s.ownerId === filterOwner);
+      return matchSearch && matchStatus && matchAction && matchOwner;
     })
     .sort((a, b) => {
       if (!sortCol) return 0;
-      const av = a[sortCol as keyof Supplier] ?? "";
-      const bv = b[sortCol as keyof Supplier] ?? "";
+      const raw = (x: Supplier) =>
+        sortCol === "owner" ? (x.owner?.name ?? "") : (x[sortCol as keyof Supplier] ?? "");
+      const av = raw(a), bv = raw(b);
       const as = typeof av === "boolean" ? (av ? "1" : "0") : String(av);
       const bs = typeof bv === "boolean" ? (bv ? "1" : "0") : String(bv);
       const cmp = as.localeCompare(bs, undefined, { numeric: true, sensitivity: "base" });
@@ -413,6 +421,12 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
           <option value="ALL">Toutes les actions</option>
           {ACTION_OPTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
         </select>
+        <select value={filterOwner} onChange={(e) => setFilterOwner(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <option value="ALL">Tous les owners</option>
+          <option value="UNASSIGNED">Non assigné</option>
+          {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
         <div className="flex-1" />
         {canEdit && (
           <>
@@ -437,6 +451,7 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <SortTh col="supplierName" label="Fournisseur" className="px-4" {...sortProps} />
+                <SortTh col="owner"        label="Owner"       {...sortProps} />
                 <SortTh col="status"       label="Statut"      {...sortProps} />
                 <SortTh col="action"       label="Action"      {...sortProps} />
                 <SortTh col="accountCreated"   label="Compte"    align="center" {...sortProps} />
@@ -451,12 +466,13 @@ export function SuppliersTab({ waveId, initialSuppliers, canEdit }: {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {sorted.length === 0 && (
-                <tr><td colSpan={11} className="text-center py-12 text-gray-400">Aucun fournisseur trouvé</td></tr>
+                <tr><td colSpan={12} className="text-center py-12 text-gray-400">Aucun fournisseur trouvé</td></tr>
               )}
               {sorted.map((s) => (
                 <SupplierRow
                   key={s.id}
                   supplier={s}
+                  users={users}
                   canEdit={canEdit}
                   saving={saving}
                   editingCommentId={editingCommentId}
@@ -543,10 +559,10 @@ function SupplierModal({
 
 // ── Supplier row ──────────────────────────────────────────────────────────────
 function SupplierRow({
-  supplier: s, canEdit, saving, editingCommentId, setEditingCommentId,
+  supplier: s, users, canEdit, saving, editingCommentId, setEditingCommentId,
   onToggle, onPatch, onDelete, onEdit,
 }: {
-  supplier: Supplier; canEdit: boolean; saving: string | null;
+  supplier: Supplier; users: UserItem[]; canEdit: boolean; saving: string | null;
   editingCommentId: string | null; setEditingCommentId: (id: string | null) => void;
   onToggle: (s: Supplier, f: "accountCreated"|"registeredWebinar"|"assistedWebinar"|"configured") => void;
   onPatch: (id: string, data: Partial<Supplier>) => void;
@@ -576,6 +592,33 @@ function SupplierRow({
           {s.phone    && <span className="text-xs text-gray-300 flex items-center gap-0.5"><Phone  className="w-2.5 h-2.5" />{s.phone}</span>}
           {s.language && <span className="text-xs text-gray-300 flex items-center gap-0.5"><Globe  className="w-2.5 h-2.5" />{s.language}</span>}
         </div>
+      </td>
+
+      {/* Owner */}
+      <td className="px-3 py-3">
+        {canEdit ? (
+          <div className="relative">
+            <select
+              value={s.ownerId ?? ""}
+              onChange={(e) => {
+                const uid = e.target.value || null;
+                const u = users.find((x) => x.id === uid);
+                onPatch(s.id, { ownerId: uid, owner: u ? { id: u.id, name: u.name } : null });
+              }}
+              className={`appearance-none text-xs px-2 py-1.5 pr-5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-400 max-w-[130px] truncate ${
+                s.ownerId ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-white text-gray-400"
+              }`}
+            >
+              <option value="">Non assigné</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+            <ChevronDown className="w-2.5 h-2.5 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+          </div>
+        ) : (
+          s.owner
+            ? <span className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">{s.owner.name}</span>
+            : <span className="text-xs text-gray-300">—</span>
+        )}
       </td>
 
       {/* Statut */}

@@ -24,7 +24,10 @@ export default async function WaveDetailPage({ params }: { params: Promise<{ id:
           },
           orderBy: { order: "asc" },
         },
-        suppliers: { orderBy: { supplierName: "asc" } },
+        suppliers: {
+          orderBy: { supplierName: "asc" },
+          include: { owner: { select: { id: true, name: true } } },
+        },
       },
     }),
     prisma.user.findMany({
