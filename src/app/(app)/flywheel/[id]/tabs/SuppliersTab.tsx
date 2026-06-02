@@ -228,8 +228,8 @@ function nullify(form: SupplierForm) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function SuppliersTab({ waveId, initialSuppliers, users, canEdit }: {
-  waveId: string; initialSuppliers: Supplier[]; users: UserItem[]; canEdit: boolean;
+export function SuppliersTab({ waveId, initialSuppliers, users, canEdit, canManage }: {
+  waveId: string; initialSuppliers: Supplier[]; users: UserItem[]; canEdit: boolean; canManage: boolean;
 }) {
   const [suppliers, setSuppliers] = useState(initialSuppliers);
   const [search, setSearch]           = useState("");
@@ -428,7 +428,7 @@ export function SuppliersTab({ waveId, initialSuppliers, users, canEdit }: {
           {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <div className="flex-1" />
-        {canEdit && (
+        {canManage && (
           <>
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
             <button onClick={() => fileRef.current?.click()} disabled={importing}
@@ -474,6 +474,7 @@ export function SuppliersTab({ waveId, initialSuppliers, users, canEdit }: {
                   supplier={s}
                   users={users}
                   canEdit={canEdit}
+                  canManage={canManage}
                   saving={saving}
                   editingCommentId={editingCommentId}
                   setEditingCommentId={setEditingCommentId}
@@ -559,10 +560,10 @@ function SupplierModal({
 
 // ── Supplier row ──────────────────────────────────────────────────────────────
 function SupplierRow({
-  supplier: s, users, canEdit, saving, editingCommentId, setEditingCommentId,
+  supplier: s, users, canEdit, canManage, saving, editingCommentId, setEditingCommentId,
   onToggle, onPatch, onDelete, onEdit,
 }: {
-  supplier: Supplier; users: UserItem[]; canEdit: boolean; saving: string | null;
+  supplier: Supplier; users: UserItem[]; canEdit: boolean; canManage: boolean; saving: string | null;
   editingCommentId: string | null; setEditingCommentId: (id: string | null) => void;
   onToggle: (s: Supplier, f: "accountCreated"|"registeredWebinar"|"assistedWebinar"|"configured") => void;
   onPatch: (id: string, data: Partial<Supplier>) => void;
@@ -754,11 +755,13 @@ function SupplierRow({
               title="Modifier">
               <Pencil className="w-3.5 h-3.5" />
             </button>
-            <button onClick={() => onDelete(s.id)}
-              className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-              title="Supprimer">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            {canManage && (
+              <button onClick={() => onDelete(s.id)}
+                className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                title="Supprimer">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </td>
       )}

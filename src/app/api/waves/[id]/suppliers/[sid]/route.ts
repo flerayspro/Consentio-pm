@@ -45,6 +45,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string; sid: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  if (session.user.role === "MEMBER")
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
   const { sid } = await params;
   await prisma.waveSupplier.delete({ where: { id: sid } });

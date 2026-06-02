@@ -335,7 +335,8 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
             waveId={wave.id}
             initialSuppliers={wave.suppliers}
             users={users}
-            canEdit={canEdit}
+            canEdit={true}
+            canManage={canEdit}
           />
         )}
       </div>
