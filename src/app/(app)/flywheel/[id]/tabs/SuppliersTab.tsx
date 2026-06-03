@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import {
   Upload, Plus, Trash2, Search, X, CheckCircle2, XCircle,
   ChevronDown, Users, Phone, Globe, MessageSquare, Building2,
-  Minus, Pencil,
+  Minus, Pencil, Download,
 } from "lucide-react";
 
 interface Supplier {
@@ -379,6 +379,49 @@ export function SuppliersTab({ waveId, initialSuppliers, users, canEdit, canMana
 
   const sortProps = { sortCol, sortDir, onSort: toggleSort };
 
+  // ── Export CSV ─────────────────────────────────────────────────────────────
+  function exportCsv() {
+    const HEADERS = [
+      "Nom fournisseur", "Code fournisseur", "Email",
+      "Prénom", "Nom", "Téléphone", "Langue",
+      "Statut", "Action", "Tentatives", "Owner", "Workspace ID",
+      "Compte créé", "Inscrit webinaire", "Formé (webinaire)", "Configuré",
+      "Commentaires",
+    ];
+
+    const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+    const rows = sorted.map((s) => [
+      s.supplierName,
+      s.supplierCode ?? "",
+      s.email ?? "",
+      s.firstName ?? "",
+      s.lastName ?? "",
+      s.phone ?? "",
+      s.language ?? "",
+      statusLabel(s.status),
+      actionLabel(s.action),
+      s.action === "ATTEMPTED" ? String(s.callAttempts) : "",
+      s.owner?.name ?? "",
+      s.workspaceId ?? "",
+      s.accountCreated  ? "Oui" : "Non",
+      s.registeredWebinar ? "Oui" : "Non",
+      s.assistedWebinar ? "Oui" : "Non",
+      s.configured      ? "Oui" : "Non",
+      s.comments ?? "",
+    ]);
+
+    // BOM UTF-8 pour que Excel ouvre correctement les accents
+    const csv = "﻿" + [HEADERS, ...rows].map((row) => row.map(esc).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `fournisseurs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="p-6 space-y-5">
       {/* KPI Bar */}
@@ -428,6 +471,14 @@ export function SuppliersTab({ waveId, initialSuppliers, users, canEdit, canMana
           {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <div className="flex-1" />
+        <button
+          onClick={exportCsv}
+          title={`Exporter ${sorted.length} fournisseur${sorted.length !== 1 ? "s" : ""} en CSV`}
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <Download className="w-4 h-4" />
+          Exporter CSV
+        </button>
         {canManage && (
           <>
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
