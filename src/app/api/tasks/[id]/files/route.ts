@@ -4,24 +4,44 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { put } from "@vercel/blob";
 
+export const maxDuration = 30; // 30s pour les gros fichiers
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  const { id } = await params;
-
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
-      { error: "Stockage non configuré — ajoutez BLOB_READ_WRITE_TOKEN dans les variables d'environnement" },
+      { error: "Stockage non configuré — BLOB_READ_WRITE_TOKEN manquant" },
       { status: 503 }
     );
   }
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File;
-  if (!file) return NextResponse.json({ error: "Aucun fichier" }, { status: 400 });
+  const { id } = await params;
 
-  const blob = await put(`tasks/${id}/${file.name}`, file, { access: "public" });
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Impossible de lire le fichier envoyé" }, { status: 400 });
+  }
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) {
+    return NextResponse.json({ error: "Aucun fichier valide" }, { status: 400 });
+  }
+
+  // Nom sécurisé pour l'URL (évite caractères spéciaux)
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+  let blob: { url: string };
+  try {
+    blob = await put(`tasks/${id}/${Date.now()}-${safeName}`, file, { access: "public" });
+  } catch (err) {
+    console.error("[upload] Vercel Blob error:", err);
+    const msg = err instanceof Error ? err.message : "Erreur inconnue";
+    return NextResponse.json({ error: `Échec du stockage : ${msg}` }, { status: 502 });
+  }
 
   const taskFile = await prisma.taskFile.create({
     data: {
