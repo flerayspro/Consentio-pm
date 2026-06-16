@@ -10,7 +10,7 @@ export default async function WaveDetailPage({ params }: { params: Promise<{ id:
 
   const { id } = await params;
 
-  const [wave, users] = await Promise.all([
+  const [wave, users, allTags] = await Promise.all([
     prisma.wave.findUnique({
       where: { id },
       include: {
@@ -28,12 +28,14 @@ export default async function WaveDetailPage({ params }: { params: Promise<{ id:
           orderBy: { supplierName: "asc" },
           include: { owner: { select: { id: true, name: true } } },
         },
+        tags: { select: { id: true, name: true, color: true } },
       },
     }),
     prisma.user.findMany({
       select: { id: true, name: true, email: true, role: true },
       orderBy: { name: "asc" },
     }),
+    prisma.tag.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   if (!wave) notFound();
@@ -42,6 +44,7 @@ export default async function WaveDetailPage({ params }: { params: Promise<{ id:
     <WaveDetailClient
       wave={wave}
       users={users}
+      allTags={allTags}
       currentUserRole={session.user.role}
       currentUserId={session.user.id}
     />

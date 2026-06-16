@@ -63,8 +63,17 @@ export function ProjectDetailClient({
   const [tagSaving, setTagSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [projectName, setProjectName] = useState(project.name);
 
   const router = useRouter();
+
+  async function saveProjectName() {
+    if (!projectName.trim() || projectName === project.name) return;
+    await fetch(`/api/projects/${project.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: projectName.trim() }),
+    });
+  }
 
   const allTasks = milestones.flatMap((m) => m.tasks);
   const doneTasks = allTasks.filter((t) => t.status === "DONE").length;
@@ -146,7 +155,12 @@ export function ProjectDetailClient({
             </Link>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-gray-900">{project.name}</h1>
+                <input
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  onBlur={saveProjectName}
+                  className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none pb-0.5 transition-colors min-w-[200px]"
+                />
                 {/* Health badge */}
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${healthOption.color}`}>
                   {healthOption.label}

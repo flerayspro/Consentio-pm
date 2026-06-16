@@ -51,8 +51,10 @@ export function ProjectsClient({
   currentUserRole: string; currentUserId: string;
 }) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("ALL");
+  const [search, setSearch]           = useState("");
+  const [filter, setFilter]           = useState("ALL");
+  const [filterTag, setFilterTag]     = useState("ALL");
+  const [filterManager, setFilterManager] = useState("ALL");
   const [showNewModal, setShowNewModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
@@ -61,9 +63,11 @@ export function ProjectsClient({
   });
 
   const filtered = projects.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === "ALL" || p.status === filter;
-    return matchSearch && matchFilter;
+    const matchSearch  = p.name.toLowerCase().includes(search.toLowerCase());
+    const matchFilter  = filter === "ALL" || p.status === filter;
+    const matchTag     = filterTag === "ALL" || p.tags.some((t) => t.id === filterTag);
+    const matchManager = filterManager === "ALL" || p.manager.id === filterManager;
+    return matchSearch && matchFilter && matchTag && matchManager;
   });
 
   async function handleCreate(e: React.FormEvent) {
@@ -118,16 +122,25 @@ export function ProjectsClient({
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}
+          className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="ALL">Tous les statuts</option>
           <option value="ACTIVE">Actif</option>
           <option value="COMPLETED">Terminé</option>
           <option value="ON_HOLD">En pause</option>
           <option value="CANCELLED">Annulé</option>
+        </select>
+        {allTags.length > 0 && (
+          <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)}
+            className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="ALL">Tous les tags</option>
+            {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
+        <select value={filterManager} onChange={(e) => setFilterManager(e.target.value)}
+          className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="ALL">Tous les chefs de projet</option>
+          {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
       </div>
 

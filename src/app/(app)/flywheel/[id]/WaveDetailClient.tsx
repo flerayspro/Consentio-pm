@@ -7,8 +7,9 @@ import dynamic from "next/dynamic";
 import { formatDate } from "@/lib/utils";
 import {
   ChevronLeft, Calendar, User, Save, Pencil,
-  Building2, ChevronDown, Trash2, AlertTriangle,
+  Building2, ChevronDown, Trash2, AlertTriangle, Tag, Plus, X,
 } from "lucide-react";
+import { TagBadge } from "@/components/ui/TagBadge";
 import { SuppliersTab } from "./tabs/SuppliersTab";
 import { WaveMilestonesTab } from "./tabs/WaveMilestonesTab";
 import { WaveTaskPanel } from "./WaveTaskPanel";
@@ -46,17 +47,19 @@ interface WaveSupplier {
   registeredWebinar: boolean; assistedWebinar: boolean; configured: boolean; productFamilies: string[];
   ownerId: string | null; owner: { id: string; name: string } | null;
 }
+interface TagItem { id: string; name: string; color: string; }
 interface Wave {
   id: string; name: string; clientName: string; status: string;
   startDate: Date; endDate: Date; summary: string | null;
   manager: { id: string; name: string; email: string };
   milestones: WaveMilestone[];
   suppliers: WaveSupplier[];
+  tags: TagItem[];
 }
 interface User { id: string; name: string; email: string; role: string; }
 
-export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }: {
-  wave: Wave; users: User[]; currentUserRole: string; currentUserId: string;
+export function WaveDetailClient({ wave, users, allTags, currentUserRole, currentUserId }: {
+  wave: Wave; users: User[]; allTags: TagItem[]; currentUserRole: string; currentUserId: string;
 }) {
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Résumé");
   const [milestones, setMilestones] = useState<WaveMilestone[]>(wave.milestones);
@@ -67,6 +70,13 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [waveName, setWaveName] = useState(wave.name);
+  const [manager, setManager] = useState(wave.manager);
+  const [editingManager, setEditingManager] = useState(false);
+  const [managerSaving, setManagerSaving] = useState(false);
+  const [waveTags, setWaveTags] = useState<TagItem[]>(wave.tags);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [tagSaving, setTagSaving] = useState(false);
 
   const router = useRouter();
   const canEdit = currentUserRole !== "MEMBER";
@@ -105,6 +115,40 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
     }
   }
 
+  async function saveWaveName() {
+    if (!waveName.trim() || waveName === wave.name) return;
+    await fetch(`/api/waves/${wave.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: waveName.trim() }),
+    });
+  }
+
+  async function saveManager(newManagerId: string) {
+    setManagerSaving(true);
+    const res = await fetch(`/api/waves/${wave.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ managerId: newManagerId }),
+    });
+    if (res.ok) {
+      const found = users.find((u) => u.id === newManagerId);
+      if (found) setManager({ id: found.id, name: found.name, email: found.email });
+    }
+    setManagerSaving(false);
+    setEditingManager(false);
+  }
+
+  async function toggleTag(tag: TagItem) {
+    const has = waveTags.some((t) => t.id === tag.id);
+    const next = has ? waveTags.filter((t) => t.id !== tag.id) : [...waveTags, tag];
+    setWaveTags(next);
+    setTagSaving(true);
+    await fetch(`/api/waves/${wave.id}/tags`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagIds: next.map((t) => t.id) }),
+    });
+    setTagSaving(false);
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handleTaskUpdate(taskId: string, updated: Record<string, any>) {
     setMilestones((prev) => prev.map((m) => ({
@@ -125,7 +169,12 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
             </Link>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-gray-900">{wave.name}</h1>
+                <input
+                  value={waveName}
+                  onChange={(e) => setWaveName(e.target.value)}
+                  onBlur={saveWaveName}
+                  className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-emerald-400 focus:outline-none pb-0.5 transition-colors min-w-[200px]"
+                />
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${statusOpt.color}`}>
                   {statusOpt.label}
                 </span>
@@ -134,7 +183,7 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
                 </span>
               </div>
               <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-400">
-                <span className="flex items-center gap-1"><User className="w-3 h-3" />{wave.manager.name}</span>
+                <span className="flex items-center gap-1"><User className="w-3 h-3" />{manager.name}</span>
                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(wave.startDate)} → {formatDate(wave.endDate)}</span>
                 <span>{wave.suppliers.length} fournisseur{wave.suppliers.length !== 1 ? "s" : ""}</span>
               </div>
@@ -244,9 +293,32 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
                 </div>
                 <div className="flex items-start gap-2.5">
                   <User className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-400 mb-0.5">Chef de projet</p>
-                    <p className="text-sm font-medium text-gray-900">{wave.manager.name}</p>
+                    {editingManager ? (
+                      <div className="flex items-center gap-1.5">
+                        <select defaultValue={manager.id}
+                          onChange={(e) => saveManager(e.target.value)}
+                          disabled={managerSaving} autoFocus
+                          className="flex-1 min-w-0 text-sm border border-emerald-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60">
+                          {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        </select>
+                        <button onClick={() => setEditingManager(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-sm font-medium text-gray-900">{manager.name}</p>
+                        {canEdit && (
+                          <button onClick={() => setEditingManager(true)}
+                            className="p-1 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                            title="Modifier le chef de projet">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5">
@@ -291,6 +363,56 @@ export function WaveDetailClient({ wave, users, currentUserRole, currentUserId }
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Tags */}
+              {allTags.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <Tag className="w-3 h-3" /> Tags
+                    </p>
+                    {canEdit && (
+                      <button onClick={() => setShowTagPicker((v) => !v)}
+                        className="p-1 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                        title="Gérer les tags">
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {waveTags.length === 0 && !showTagPicker && (
+                      <p className="text-xs text-gray-300">Aucun tag</p>
+                    )}
+                    {waveTags.map((tag) => (
+                      <div key={tag.id} className="group relative">
+                        <TagBadge name={tag.name} color={tag.color} size="sm" />
+                        {canEdit && (
+                          <button onClick={() => toggleTag(tag)} disabled={tagSaving}
+                            className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gray-500 hover:bg-red-500 text-white rounded-full text-xs hidden group-hover:flex items-center justify-center transition-colors">
+                            <X className="w-2 h-2" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {showTagPicker && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <p className="text-xs text-gray-400 mb-1.5">Ajouter un tag :</p>
+                      <div className="flex flex-col gap-1">
+                        {allTags.filter((t) => !waveTags.some((wt) => wt.id === t.id)).map((tag) => (
+                          <button key={tag.id} onClick={() => toggleTag(tag)} disabled={tagSaving}
+                            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors text-left disabled:opacity-60">
+                            <TagBadge name={tag.name} color={tag.color} size="sm" />
+                          </button>
+                        ))}
+                        {allTags.filter((t) => !waveTags.some((wt) => wt.id === t.id)).length === 0 && (
+                          <p className="text-xs text-gray-300 px-2">Tous les tags sont ajoutés</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

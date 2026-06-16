@@ -134,7 +134,7 @@ export function Sidebar({ user, projects, templates, waves, waveTemplates }: Sid
   const flywheelNavItems = [
     { href: "/flywheel/dashboard",   label: "Dashboard",           icon: LayoutDashboard },
     { href: "/flywheel/mes-taches",  label: "Mes tâches",          icon: CheckSquare },
-    { href: "/flywheel",             label: "Vagues d'activation", icon: Zap },
+    { href: "/flywheel",             label: "Tous les projets",    icon: Zap },
     ...(user.role !== "MEMBER" ? [{ href: "/flywheel/templates", label: "Templates", icon: FileStack }] : []),
   ];
 

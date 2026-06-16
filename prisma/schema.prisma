@@ -44,6 +44,7 @@ model Tag {
   updatedAt DateTime @updatedAt
 
   projects Project[] @relation("ProjectTags")
+  waves    Wave[]    @relation("WaveTags")
 }
 
 model WaveTemplate {
@@ -224,6 +225,7 @@ model Wave {
   template    WaveTemplate? @relation(fields: [templateId], references: [id])
   milestones  WaveMilestone[]
   suppliers   WaveSupplier[]
+  tags        Tag[]          @relation("WaveTags")
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }

@@ -497,9 +497,9 @@ export function SuppliersTab({ waveId, initialSuppliers, users, canEdit, canMana
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[65vh]">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 border-b border-gray-100">
                 <SortTh col="supplierName" label="Fournisseur" className="px-4" {...sortProps} />
                 <SortTh col="owner"        label="Owner"       {...sortProps} />
