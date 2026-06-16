@@ -29,6 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         include: { uploadedBy: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
       },
+      subTasks: { orderBy: { createdAt: "asc" } },
     },
   });
 

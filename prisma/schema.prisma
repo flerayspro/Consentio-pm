@@ -195,6 +195,17 @@ model Task {
 
   comments TaskComment[]
   files    TaskFile[]
+  subTasks SubTask[]
+}
+
+model SubTask {
+  id        String   @id @default(cuid())
+  title     String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
 }
 
 model TaskComment {
@@ -260,8 +271,19 @@ model WaveTask {
   status      String        @default("TODO")
   pctComplete Float         @default(0)
   comments    WaveTaskComment[]
+  subTasks    WaveSubTask[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+}
+
+model WaveSubTask {
+  id        String   @id @default(cuid())
+  title     String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      WaveTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
 }
 
 model WaveTaskComment {

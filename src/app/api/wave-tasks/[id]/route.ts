@@ -26,6 +26,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         include: { author: { select: { id: true, name: true } } },
         orderBy: { createdAt: "asc" },
       },
+      subTasks: { orderBy: { createdAt: "asc" } },
     },
   });
 

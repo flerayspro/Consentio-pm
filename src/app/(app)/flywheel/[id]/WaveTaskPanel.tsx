@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { formatDate } from "@/lib/utils";
-import { X, Calendar, User, Send, Trash2, CheckCircle2, Clock, Circle } from "lucide-react";
+import { X, Calendar, User, Send, Trash2, CheckCircle2, Clock, Circle, Plus, ListTodo } from "lucide-react";
 
 interface Comment { id: string; content: string; createdAt: string; author: { id: string; name: string }; }
+interface SubTaskItem { id: string; title: string; done: boolean; }
 interface WaveTaskDetail {
   id: string; name: string; description?: string | null; status: string;
   dueDate: string; startDate?: string | null;
   assignee?: { id: string; name: string } | null;
   comments: Comment[];
+  subTasks: SubTaskItem[];
 }
 interface UserItem { id: string; name: string; role: string; }
 
@@ -35,13 +37,15 @@ export function WaveTaskPanel({ taskId, users, currentUserId, currentUserRole, o
   const [comment, setComment] = useState("");
   const [sendingComment, setSendingComment] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [newSubTask, setNewSubTask] = useState("");
+  const [addingSubTask, setAddingSubTask] = useState(false);
 
-  const [editName, setEditName]           = useState("");
-  const [editDesc, setEditDesc]           = useState("");
-  const [editDueDate, setEditDueDate]     = useState("");
-  const [editStartDate, setEditStartDate] = useState("");
+  const [editName, setEditName]             = useState("");
+  const [editDesc, setEditDesc]             = useState("");
+  const [editDueDate, setEditDueDate]       = useState("");
+  const [editStartDate, setEditStartDate]   = useState("");
   const [editAssigneeId, setEditAssigneeId] = useState("");
-  const [editStatus, setEditStatus]       = useState("");
+  const [editStatus, setEditStatus]         = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -94,6 +98,34 @@ export function WaveTaskPanel({ taskId, users, currentUserId, currentUserRole, o
     if (res.ok) setTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== id) } : prev);
   }
 
+  async function addSubTask() {
+    if (!newSubTask.trim()) return;
+    setAddingSubTask(true);
+    const res = await fetch(`/api/wave-tasks/${taskId}/subtasks`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newSubTask.trim() }),
+    });
+    if (res.ok) {
+      const s = await res.json();
+      setTask((prev) => prev ? { ...prev, subTasks: [...prev.subTasks, s] } : prev);
+      setNewSubTask("");
+    }
+    setAddingSubTask(false);
+  }
+
+  async function toggleSubTask(id: string, done: boolean) {
+    setTask((prev) => prev ? { ...prev, subTasks: prev.subTasks.map((s) => s.id === id ? { ...s, done } : s) } : prev);
+    await fetch(`/api/wave-subtasks/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ done }),
+    });
+  }
+
+  async function deleteSubTask(id: string) {
+    setTask((prev) => prev ? { ...prev, subTasks: prev.subTasks.filter((s) => s.id !== id) } : prev);
+    await fetch(`/api/wave-subtasks/${id}`, { method: "DELETE" });
+  }
+
   void saving;
 
   return (
@@ -124,7 +156,6 @@ export function WaveTaskPanel({ taskId, users, currentUserId, currentUserRole, o
 
             {/* Champs */}
             <div className="px-5 py-3 grid grid-cols-2 gap-3 border-b border-gray-100">
-              {/* Statut */}
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Statut</label>
                 <select value={editStatus}
@@ -133,8 +164,6 @@ export function WaveTaskPanel({ taskId, users, currentUserId, currentUserRole, o
                   {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
-
-              {/* Échéance */}
               <div>
                 <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />Échéance</label>
                 <input type="date" value={editDueDate}
@@ -143,8 +172,6 @@ export function WaveTaskPanel({ taskId, users, currentUserId, currentUserRole, o
                   className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
-
-              {/* Début */}
               <div>
                 <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />Début</label>
                 <input type="date" value={editStartDate}
@@ -153,8 +180,6 @@ export function WaveTaskPanel({ taskId, users, currentUserId, currentUserRole, o
                   className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
-
-              {/* Assigné */}
               <div>
                 <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1"><User className="w-3 h-3" />Responsable</label>
                 <select value={editAssigneeId}
@@ -163,6 +188,75 @@ export function WaveTaskPanel({ taskId, users, currentUserId, currentUserRole, o
                   <option value="">Non assigné</option>
                   {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
+              </div>
+            </div>
+
+            {/* Sous-tâches */}
+            <div className="px-5 py-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 mb-2">
+                <ListTodo className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-medium text-gray-500">
+                  Sous-tâches
+                  {task.subTasks.length > 0 && (
+                    <span className="ml-1.5 text-gray-400">
+                      ({task.subTasks.filter((s) => s.done).length}/{task.subTasks.length})
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {task.subTasks.length > 0 && (
+                <div className="w-full bg-gray-100 rounded-full h-1 mb-2.5">
+                  <div
+                    className="h-1 rounded-full bg-emerald-500 transition-all"
+                    style={{ width: `${Math.round((task.subTasks.filter((s) => s.done).length / task.subTasks.length) * 100)}%` }}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1 mb-2">
+                {task.subTasks.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2 group py-0.5">
+                    <button
+                      onClick={() => toggleSubTask(s.id, !s.done)}
+                      className={`flex-shrink-0 w-4 h-4 rounded border transition-colors flex items-center justify-center ${
+                        s.done ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300 hover:border-emerald-400"
+                      }`}
+                    >
+                      {s.done && <CheckCircle2 className="w-3 h-3" />}
+                    </button>
+                    <span className={`flex-1 text-sm ${s.done ? "line-through text-gray-400" : "text-gray-700"}`}>
+                      {s.title}
+                    </span>
+                    <button
+                      onClick={() => deleteSubTask(s.id)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-red-400 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                <input
+                  value={newSubTask}
+                  onChange={(e) => setNewSubTask(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addSubTask()}
+                  placeholder="Ajouter une sous-tâche..."
+                  disabled={addingSubTask}
+                  className="flex-1 text-sm text-gray-700 placeholder-gray-300 bg-transparent border-0 focus:outline-none disabled:opacity-60"
+                />
+                {newSubTask.trim() && (
+                  <button
+                    onClick={addSubTask}
+                    disabled={addingSubTask}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-60"
+                  >
+                    Ajouter
+                  </button>
+                )}
               </div>
             </div>
 

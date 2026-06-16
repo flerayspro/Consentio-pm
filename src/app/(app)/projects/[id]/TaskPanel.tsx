@@ -4,15 +4,16 @@ import { useEffect, useState, useRef } from "react";
 import { formatDate } from "@/lib/utils";
 import {
   X, Calendar, User, Send, Trash2, Paperclip, Download,
-  FileText, CheckCircle2, Clock, Circle,
+  FileText, CheckCircle2, Clock, Circle, Plus, ListTodo,
 } from "lucide-react";
 
 interface Comment { id: string; content: string; createdAt: string; author: { id: string; name: string }; }
 interface TaskFileItem { id: string; name: string; url: string; size: number; mimeType?: string | null; createdAt: string; uploadedBy: { id: string; name: string }; }
+interface SubTaskItem { id: string; title: string; done: boolean; }
 interface TaskDetail {
   id: string; name: string; description?: string | null; status: string;
   dueDate: string; owner?: { id: string; name: string } | null;
-  comments: Comment[]; files: TaskFileItem[];
+  comments: Comment[]; files: TaskFileItem[]; subTasks: SubTaskItem[];
 }
 interface UserItem { id: string; name: string; role: string; }
 
@@ -51,6 +52,8 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
   const [editOwnerId, setEditOwnerId] = useState("");
   const [editStatus, setEditStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [newSubTask, setNewSubTask] = useState("");
+  const [addingSubTask, setAddingSubTask] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -122,6 +125,34 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
     if (res.ok) setTask((prev) => prev ? { ...prev, files: prev.files.filter((f) => f.id !== id) } : prev);
   }
 
+  async function addSubTask() {
+    if (!newSubTask.trim()) return;
+    setAddingSubTask(true);
+    const res = await fetch(`/api/tasks/${taskId}/subtasks`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newSubTask.trim() }),
+    });
+    if (res.ok) {
+      const s = await res.json();
+      setTask((prev) => prev ? { ...prev, subTasks: [...prev.subTasks, s] } : prev);
+      setNewSubTask("");
+    }
+    setAddingSubTask(false);
+  }
+
+  async function toggleSubTask(id: string, done: boolean) {
+    setTask((prev) => prev ? { ...prev, subTasks: prev.subTasks.map((s) => s.id === id ? { ...s, done } : s) } : prev);
+    await fetch(`/api/subtasks/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ done }),
+    });
+  }
+
+  async function deleteSubTask(id: string) {
+    setTask((prev) => prev ? { ...prev, subTasks: prev.subTasks.filter((s) => s.id !== id) } : prev);
+    await fetch(`/api/subtasks/${id}`, { method: "DELETE" });
+  }
+
   return (
     <>
       {/* Overlay */}
@@ -182,6 +213,77 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
                   <option value="">Non assigné</option>
                   {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
+              </div>
+            </div>
+
+            {/* Sous-tâches */}
+            <div className="px-5 py-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 mb-2">
+                <ListTodo className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-medium text-gray-500">
+                  Sous-tâches
+                  {task.subTasks.length > 0 && (
+                    <span className="ml-1.5 text-gray-400">
+                      ({task.subTasks.filter((s) => s.done).length}/{task.subTasks.length})
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Barre de progression */}
+              {task.subTasks.length > 0 && (
+                <div className="w-full bg-gray-100 rounded-full h-1 mb-2.5">
+                  <div
+                    className="h-1 rounded-full bg-blue-500 transition-all"
+                    style={{ width: `${Math.round((task.subTasks.filter((s) => s.done).length / task.subTasks.length) * 100)}%` }}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1 mb-2">
+                {task.subTasks.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2 group py-0.5">
+                    <button
+                      onClick={() => toggleSubTask(s.id, !s.done)}
+                      className={`flex-shrink-0 w-4 h-4 rounded border transition-colors flex items-center justify-center ${
+                        s.done ? "bg-blue-500 border-blue-500 text-white" : "border-gray-300 hover:border-blue-400"
+                      }`}
+                    >
+                      {s.done && <CheckCircle2 className="w-3 h-3" />}
+                    </button>
+                    <span className={`flex-1 text-sm ${s.done ? "line-through text-gray-400" : "text-gray-700"}`}>
+                      {s.title}
+                    </span>
+                    <button
+                      onClick={() => deleteSubTask(s.id)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-red-400 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Ajouter une sous-tâche */}
+              <div className="flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                <input
+                  value={newSubTask}
+                  onChange={(e) => setNewSubTask(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addSubTask()}
+                  placeholder="Ajouter une sous-tâche..."
+                  disabled={addingSubTask}
+                  className="flex-1 text-sm text-gray-700 placeholder-gray-300 bg-transparent border-0 focus:outline-none disabled:opacity-60"
+                />
+                {newSubTask.trim() && (
+                  <button
+                    onClick={addSubTask}
+                    disabled={addingSubTask}
+                    className="text-xs text-blue-500 hover:text-blue-700 font-medium disabled:opacity-60"
+                  >
+                    Ajouter
+                  </button>
+                )}
               </div>
             </div>
 
