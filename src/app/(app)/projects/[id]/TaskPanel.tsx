@@ -333,7 +333,7 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
                       <span className="flex-1 text-xs text-gray-700 truncate">{f.name}</span>
                       <span className="text-xs text-gray-400">{formatSize(f.size)}</span>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <a href={f.url} target="_blank" rel="noreferrer" className="text-gray-400 hover:text-blue-500">
+                        <a href={`/api/files/${f.id}/download`} download={f.name} className="text-gray-400 hover:text-blue-500">
                           <Download className="w-3.5 h-3.5" />
                         </a>
                         <button onClick={() => deleteFile(f.id)} className="text-gray-400 hover:text-red-400">

@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   let blob: { url: string };
   try {
-    blob = await put(`tasks/${id}/${Date.now()}-${safeName}`, file, { access: "public" });
+    blob = await put(`tasks/${id}/${Date.now()}-${safeName}`, file, { access: "private" });
   } catch (err) {
     console.error("[upload] Vercel Blob error:", err);
     const msg = err instanceof Error ? err.message : "Erreur inconnue";
