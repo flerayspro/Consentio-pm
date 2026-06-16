@@ -52,6 +52,7 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
   const [editOwnerId, setEditOwnerId] = useState("");
   const [editStatus, setEditStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [newSubTask, setNewSubTask] = useState("");
   const [addingSubTask, setAddingSubTask] = useState(false);
 
@@ -109,12 +110,20 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadError(null);
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch(`/api/tasks/${taskId}/files`, { method: "POST", body: fd });
-    if (res.ok) {
-      const f = await res.json();
-      setTask((prev) => prev ? { ...prev, files: [f, ...prev.files] } : prev);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/files`, { method: "POST", body: fd });
+      if (res.ok) {
+        const f = await res.json();
+        setTask((prev) => prev ? { ...prev, files: [f, ...prev.files] } : prev);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setUploadError(err?.error ?? `Erreur ${res.status} — vérifie la configuration du stockage`);
+      }
+    } catch {
+      setUploadError("Impossible de contacter le serveur");
     }
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -311,6 +320,9 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
                 </button>
                 <input ref={fileInputRef} type="file" className="hidden" onChange={uploadFile} />
               </div>
+              {uploadError && (
+                <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 mb-2">{uploadError}</p>
+              )}
               {task.files.length === 0 ? (
                 <p className="text-xs text-gray-300 py-2">Aucun fichier</p>
               ) : (

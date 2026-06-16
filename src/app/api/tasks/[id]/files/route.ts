@@ -10,6 +10,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params;
 
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json(
+      { error: "Stockage non configuré — ajoutez BLOB_READ_WRITE_TOKEN dans les variables d'environnement" },
+      { status: 503 }
+    );
+  }
+
   const formData = await req.formData();
   const file = formData.get("file") as File;
   if (!file) return NextResponse.json({ error: "Aucun fichier" }, { status: 400 });
