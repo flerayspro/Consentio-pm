@@ -216,6 +216,19 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
               </div>
             </div>
 
+            {/* Description */}
+            <div className="px-5 py-3 border-b border-gray-100">
+              <label className="block text-xs text-gray-400 mb-1">Description</label>
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                onBlur={() => editDesc !== (task.description ?? "") && saveField("description", editDesc)}
+                rows={3}
+                placeholder="Ajoutez une description..."
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+
             {/* Sous-tâches */}
             <div className="px-5 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2 mb-2">
@@ -285,19 +298,6 @@ export function TaskPanel({ taskId, users, currentUserId, currentUserRole, onClo
                   </button>
                 )}
               </div>
-            </div>
-
-            {/* Description */}
-            <div className="px-5 py-3 border-b border-gray-100">
-              <label className="block text-xs text-gray-400 mb-1">Description</label>
-              <textarea
-                value={editDesc}
-                onChange={(e) => setEditDesc(e.target.value)}
-                onBlur={() => editDesc !== (task.description ?? "") && saveField("description", editDesc)}
-                rows={3}
-                placeholder="Ajoutez une description..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
             </div>
 
             {/* Fichiers */}
